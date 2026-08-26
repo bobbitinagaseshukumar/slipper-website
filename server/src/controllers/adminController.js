@@ -1010,4 +1010,68 @@ module.exports = {
   createFlashSale,
   deleteFlashSale,
   getAdminAuditLogs,
+
+  // Categories CRUD
+  createCategory: async (req, res, next) => {
+    try {
+      const { name, slug, description, image, displayOrder, isActive } = req.body;
+      if (!name) {
+        return errorResponse(res, 'Category name is required.', 400);
+      }
+      const cleanSlug = (slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const cat = await prisma.category.create({
+        data: {
+          name: name.trim(),
+          slug: cleanSlug,
+          description,
+          image: image || 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=800',
+          displayOrder: displayOrder ? parseInt(displayOrder, 10) : 0,
+          isActive: isActive !== undefined ? Boolean(isActive) : true,
+        },
+      });
+      await logAdminAction(req.user.id, 'CATEGORY_CREATED', { categoryId: cat.id, name });
+      return successResponse(res, 'Category created successfully.', cat, 201);
+    } catch (error) {
+      if (error.code === 'P2002') {
+        return errorResponse(res, 'A category with this slug already exists.', 400);
+      }
+      next(error);
+    }
+  },
+
+  updateCategory: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { name, slug, description, image, displayOrder, isActive } = req.body;
+      const updateData = {};
+      if (name) {
+        updateData.name = name.trim();
+        updateData.slug = (slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+      if (description !== undefined) updateData.description = description;
+      if (image !== undefined) updateData.image = image;
+      if (displayOrder !== undefined) updateData.displayOrder = parseInt(displayOrder, 10);
+      if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+
+      const cat = await prisma.category.update({
+        where: { id },
+        data: updateData,
+      });
+      await logAdminAction(req.user.id, 'CATEGORY_UPDATED', { categoryId: id });
+      return successResponse(res, 'Category updated successfully.', cat);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  deleteCategory: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      await prisma.category.delete({ where: { id } });
+      await logAdminAction(req.user.id, 'CATEGORY_DELETED', { categoryId: id });
+      return successResponse(res, 'Category deleted successfully.');
+    } catch (error) {
+      next(error);
+    }
+  },
 };

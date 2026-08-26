@@ -17,7 +17,12 @@ router.post('/products', adminController.createProduct);
 router.patch('/products/:id', adminController.updateProduct);
 router.delete('/products/:id', adminController.deleteProduct);
 
-// 3. Subcategories
+// 3. Categories
+router.post('/categories', adminController.createCategory);
+router.patch('/categories/:id', adminController.updateCategory);
+router.delete('/categories/:id', adminController.deleteCategory);
+
+// 4. Subcategories
 router.get('/subcategories', adminController.getSubCategories);
 router.post('/subcategories', adminController.createSubCategory);
 router.delete('/subcategories/:id', adminController.deleteSubCategory);

@@ -53,6 +53,8 @@ import { useStoreSettings } from '../../context/StoreSettingsContext';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import AdminHeader from '../../components/admin/AdminHeader';
 import AdminEmailCenter from '../../components/admin/AdminEmailCenter';
+import AdminCategoryManager from '../../components/admin/AdminCategoryManager';
+import AdminProductModal from '../../components/admin/AdminProductModal';
 
 const AdminPortal = () => {
   const { settings: globalSettings, updateSettings: updateGlobalSettings } = useStoreSettings();
@@ -71,6 +73,8 @@ const AdminPortal = () => {
   const [productSearch, setProductSearch] = useState('');
   const [productCategoryFilter, setProductCategoryFilter] = useState('');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
   const [categories, setCategories] = useState([]);
 
   // Subcategories State
@@ -381,6 +385,18 @@ const AdminPortal = () => {
       loadProducts();
     } catch (err) {
       showToast('error', err.message || 'Failed to create product.');
+    }
+  };
+
+  const handleDeleteProductConfirm = async () => {
+    if (!productToDelete) return;
+    try {
+      await adminService.deleteProduct(productToDelete.id);
+      showToast('success', `Product "${productToDelete.name}" deleted successfully.`);
+      setProductToDelete(null);
+      loadProducts();
+    } catch (err) {
+      showToast('error', err.message || 'Failed to delete product.');
     }
   };
 
@@ -995,50 +1011,180 @@ const AdminPortal = () => {
           )}
 
           {/* ======================================================== */}
+          {/* 3.5 CATEGORIES TAB */}
+          {/* ======================================================== */}
+          {activeTab === 'categories' && (
+            <AdminCategoryManager
+              categories={categories}
+              onRefresh={loadCategories}
+              showToast={showToast}
+            />
+          )}
+
+          {/* ======================================================== */}
           {/* 4. PRODUCTS TAB */}
           {/* ======================================================== */}
           {activeTab === 'products' && (
             <div className="space-y-6 animate-in fade-in">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-stone-900/80 border border-stone-800 p-6 rounded-3xl backdrop-blur-xl">
                 <div>
                   <h2 className="font-display font-black text-xl text-white">Slipper Product Catalog</h2>
                   <p className="text-xs text-stone-400 mt-0.5">
-                    Manage slipper styles, sizes, color variants, prices, and gallery images.
+                    Manage slipper models, pricing, size matrix, footbed materials, and high-res image galleries.
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsAddProductOpen(true)}
-                  className="px-4 py-2.5 bg-luxury-accent hover:bg-amber-400 text-stone-950 font-bold text-xs rounded-2xl shadow-glow transition-all flex items-center gap-1.5 shrink-0"
-                >
-                  <Plus className="w-4 h-4" /> Add Slipper Model
-                </button>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={productCategoryFilter}
+                    onChange={(e) => setProductCategoryFilter(e.target.value)}
+                    className="bg-stone-950 border border-stone-800 rounded-2xl px-3.5 py-2.5 text-white text-xs font-bold focus:border-luxury-accent outline-none"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setIsAddProductOpen(true);
+                    }}
+                    className="px-5 py-2.5 bg-luxury-accent hover:bg-amber-400 text-stone-950 font-bold text-xs rounded-2xl shadow-glow transition-all flex items-center gap-2 shrink-0"
+                  >
+                    <Plus className="w-4 h-4" /> Upload Slipper Model
+                  </button>
+                </div>
               </div>
 
               {/* Products Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {products.map((p) => (
-                  <div key={p.id} className="p-4 rounded-3xl bg-stone-900 border border-stone-800 space-y-3">
-                    <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-stone-950 relative">
-                      <img src={p.images?.[0]?.url || 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f'} alt={p.name} className="w-full h-full object-cover" />
-                      <span className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-stone-950/80 backdrop-blur-xs text-[10px] font-bold text-luxury-accent">
-                        {p.category?.name || 'Slides'}
-                      </span>
-                    </div>
+              {isLoadingProducts ? (
+                <div className="py-20 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-luxury-accent mx-auto" />
+                  <p className="text-xs text-stone-400 font-bold">Loading Slipper Catalog...</p>
+                </div>
+              ) : products.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {products.map((p) => {
+                    const primaryImg = p.images?.[0]?.url || 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f';
+                    const hasDiscount = p.originalPrice && p.originalPrice > p.price;
+                    const discountPct = hasDiscount ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100) : 0;
+                    return (
+                      <div
+                        key={p.id}
+                        className="group relative bg-stone-900 border border-stone-800 hover:border-luxury-accent/50 rounded-3xl overflow-hidden transition-all flex flex-col justify-between"
+                      >
+                        {/* Image Banner */}
+                        <div className="aspect-[4/3] rounded-t-3xl overflow-hidden bg-stone-950 relative">
+                          <img
+                            src={primaryImg}
+                            alt={p.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-transparent to-transparent opacity-60" />
 
-                    <div>
-                      <h4 className="font-display font-bold text-sm text-white">{p.name}</h4>
-                      <p className="text-xs font-black text-luxury-accent mt-0.5">₹{p.price}</p>
-                    </div>
+                          {/* Category Badge */}
+                          <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-stone-950/80 backdrop-blur-md text-[10px] font-bold text-luxury-accent border border-stone-800">
+                            {p.category?.name || 'Slides'}
+                          </span>
 
-                    <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-xs text-stone-400">
-                      <span>{p.variants?.length || 6} Size Variants</span>
-                      <span className="text-emerald-400 font-bold">In Stock</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                          {/* Discount Tag */}
+                          {hasDiscount && (
+                            <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-800 text-[10px] font-black">
+                              {discountPct}% OFF
+                            </span>
+                          )}
+
+                          <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs">
+                            <span className="text-[10px] font-mono font-bold text-stone-400 uppercase">
+                              {p.gender || 'UNISEX'} • {p.productType || 'Footwear'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Details */}
+                        <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
+                          <div>
+                            <h4 className="font-display font-bold text-base text-white group-hover:text-luxury-accent transition-colors">
+                              {p.name}
+                            </h4>
+                            <p className="text-xs text-stone-400 line-clamp-2 mt-1">
+                              {p.description || 'Handcrafted luxury comfort slipper engineered for daily elegance.'}
+                            </p>
+                          </div>
+
+                          {/* Price & Variants */}
+                          <div className="pt-3 border-t border-stone-800/80 flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-display font-black text-lg text-white">₹{p.price}</span>
+                                {p.originalPrice && (
+                                  <span className="text-xs text-stone-500 line-through font-bold">₹{p.originalPrice}</span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-stone-500 font-mono">
+                                {p.variants?.length || 6} Size Variants
+                              </span>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={`/product/${p.slug || p.id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white transition-colors"
+                                title="View Storefront"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingProduct(p);
+                                  setIsAddProductOpen(true);
+                                }}
+                                className="p-2 rounded-xl bg-luxury-accent/20 hover:bg-luxury-accent hover:text-stone-950 text-luxury-accent transition-all font-bold"
+                                title="Edit Slipper"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setProductToDelete(p)}
+                                className="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-900 text-rose-400 hover:text-rose-200 transition-colors"
+                                title="Delete Slipper"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-12 text-center bg-stone-900 border border-stone-800 rounded-3xl space-y-3">
+                  <Package className="w-10 h-10 text-stone-600 mx-auto" />
+                  <h3 className="font-bold text-white text-base">No Slippers Found</h3>
+                  <p className="text-xs text-stone-400">Add your first slipper model or clear your search filter.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setIsAddProductOpen(true);
+                    }}
+                    className="px-4 py-2 bg-luxury-accent text-stone-950 font-bold text-xs rounded-xl shadow-glow"
+                  >
+                    Upload Slipper Model
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -2368,139 +2514,47 @@ const AdminPortal = () => {
       {/* MODALS */}
       {/* ======================================================== */}
 
-      {/* Add Slipper Product Modal */}
-      {isAddProductOpen && (
+      {/* Add / Edit Slipper Product Modal */}
+      <AdminProductModal
+        isOpen={isAddProductOpen}
+        onClose={() => {
+          setIsAddProductOpen(false);
+          setEditingProduct(null);
+        }}
+        editingProduct={editingProduct}
+        categories={categories}
+        onSuccess={loadProducts}
+        showToast={showToast}
+      />
+
+      {/* Delete Product Confirmation Modal */}
+      {productToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAddProductOpen(false)} />
-          <div className="relative bg-stone-900 border border-stone-800 text-white w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl z-10 max-h-[90vh] overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-              <h3 className="font-display font-black text-lg text-white">Add New Slipper Model</h3>
-              <button onClick={() => setIsAddProductOpen(false)} className="text-stone-400 hover:text-white">
-                <X className="w-5 h-5" />
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setProductToDelete(null)} />
+          <div className="relative bg-stone-900 border border-rose-800 text-white w-full max-w-md rounded-3xl p-6 shadow-2xl z-10 space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-950 text-rose-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h3 className="font-display font-black text-lg text-white">Delete Slipper Model?</h3>
+            <p className="text-xs text-stone-400">
+              Are you sure you want to delete <strong className="text-white">{productToDelete.name}</strong>? This will remove all associated size variants and pricing records.
+            </p>
+            <div className="pt-3 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setProductToDelete(null)}
+                className="px-5 py-2.5 bg-stone-800 text-stone-300 rounded-xl font-bold text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProductConfirm}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs"
+              >
+                Confirm Delete
               </button>
             </div>
-
-            <form onSubmit={handleCreateProduct} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Model Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={productFormData.name}
-                    onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
-                    placeholder="e.g. Aeroflex Cloud Slide"
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Category *</label>
-                  <select
-                    value={productFormData.categoryId}
-                    onChange={(e) => setProductFormData({ ...productFormData, categoryId: e.target.value })}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Selling Price (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={productFormData.price}
-                    onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })}
-                    placeholder="899"
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white font-black"
-                  />
-                </div>
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">MRP Price (₹)</label>
-                  <input
-                    type="number"
-                    value={productFormData.originalPrice}
-                    onChange={(e) => setProductFormData({ ...productFormData, originalPrice: e.target.value })}
-                    placeholder="1299"
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Gender</label>
-                  <select
-                    value={productFormData.gender}
-                    onChange={(e) => setProductFormData({ ...productFormData, gender: e.target.value })}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                  >
-                    <option value="MEN">Men</option>
-                    <option value="WOMEN">Women</option>
-                    <option value="KIDS">Kids</option>
-                    <option value="UNISEX">Unisex</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-stone-400 font-bold uppercase mb-1">Primary Image URL *</label>
-                <input
-                  type="url"
-                  required
-                  value={productFormData.imageUrl1}
-                  onChange={(e) => setProductFormData({ ...productFormData, imageUrl1: e.target.value })}
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-stone-400 font-bold uppercase mb-1">Initial Stock Per Size</label>
-                <div className="grid grid-cols-6 gap-2">
-                  {['6', '7', '8', '9', '10', '11'].map((sz) => (
-                    <div key={sz}>
-                      <span className="text-[10px] text-stone-500 font-mono">UK {sz}</span>
-                      <input
-                        type="number"
-                        value={productFormData[`stock${sz}`]}
-                        onChange={(e) => setProductFormData({ ...productFormData, [`stock${sz}`]: e.target.value })}
-                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2 py-1 text-center text-white"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-stone-400 font-bold uppercase mb-1">Description</label>
-                <textarea
-                  rows={3}
-                  value={productFormData.description}
-                  onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
-                  placeholder="Engineered with dual-density EVA foam and arch support..."
-                  className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-stone-800 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddProductOpen(false)}
-                  className="px-4 py-2 bg-stone-800 text-stone-300 rounded-xl font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-luxury-accent text-stone-950 font-bold rounded-xl shadow-glow hover:bg-amber-400"
-                >
-                  Publish Slipper
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

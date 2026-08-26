@@ -22,6 +22,19 @@ export const adminService = {
     return await api.delete(`/admin/products/${id}`);
   },
 
+  // Categories
+  createCategory: async (categoryData) => {
+    return await api.post('/admin/categories', categoryData);
+  },
+
+  updateCategory: async (id, categoryData) => {
+    return await api.patch(`/admin/categories/${id}`, categoryData);
+  },
+
+  deleteCategory: async (id) => {
+    return await api.delete(`/admin/categories/${id}`);
+  },
+
   // Orders
   getOrders: async (params = {}) => {
     return await api.get('/admin/orders', { params });
