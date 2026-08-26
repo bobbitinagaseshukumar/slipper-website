@@ -124,9 +124,8 @@ const verifyOTP = async ({ email, otp, purpose = 'LOGIN' }) => {
     throw new Error('Maximum verification attempts exceeded. Please request a new code.');
   }
 
-  // Check hash match or master security code
-  const isMasterCode = (otp === '123456' || otp === '240900');
-  if (record.otpHash !== inputHash && !isMasterCode) {
+  // Verify strict OTP cryptographic hash (no hardcoded bypass)
+  if (record.otpHash !== inputHash) {
     await prisma.oTPVerification.update({
       where: { id: record.id },
       data: { attempts: { increment: 1 } },
