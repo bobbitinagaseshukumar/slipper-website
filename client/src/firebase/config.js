@@ -19,8 +19,17 @@ export const isFirebaseConfigured = Boolean(
 );
 
 // Initialize Firebase App safely (singleton pattern)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+let app = null;
+let auth = null;
 
-// Initialize Firebase Auth
-export const auth = getAuth(app);
+if (isFirebaseConfigured) {
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+  } catch (err) {
+    console.warn('Firebase initialization skipped or failed:', err);
+  }
+}
+
+export { auth };
 export default app;
