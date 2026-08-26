@@ -1,5 +1,6 @@
 const prisma = require('../config/db');
 const emailService = require('../services/emailService');
+const brevoService = require('../services/brevoService');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 
 /**
@@ -244,6 +245,45 @@ const getSubscribers = async (req, res, next) => {
   }
 };
 
+/**
+ * Admin: Check Brevo API Health & Credit Balance
+ */
+const getBrevoStatus = async (req, res, next) => {
+  try {
+    const status = await brevoService.getBrevoAccountInfo();
+    return successResponse(res, 'Brevo engine status retrieved.', status);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Admin: Send Direct Brevo Test Email
+ */
+const sendTestBrevoEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const targetEmail = email || req.user?.email || 'support@aurasole.com';
+
+    const result = await brevoService.sendEmailViaBrevo({
+      to: targetEmail,
+      subject: 'AuraSole — Brevo API Test Email',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #1c1917; color: #ffffff; border-radius: 12px;">
+          <h2 style="color: #d97706; margin-top: 0;">⚡ Brevo Notification Engine Operational</h2>
+          <p>This email confirms that your Brevo API Key is active and successfully dispatching transactional emails for AuraSole Footwear.</p>
+          <p style="font-size: 12px; color: #a8a29e;">Sent at: ${new Date().toISOString()}</p>
+        </div>
+      `,
+      tags: ['SYSTEM_TEST', 'BREVO_VERIFICATION'],
+    });
+
+    return successResponse(res, `Brevo test email sent successfully to ${targetEmail}`, result);
+  } catch (error) {
+    return errorResponse(res, error.message || 'Failed to dispatch email via Brevo', 500);
+  }
+};
+
 module.exports = {
   subscribe,
   unsubscribe,
@@ -254,4 +294,6 @@ module.exports = {
   sendTestEmail,
   getEmailLogs,
   getSubscribers,
+  getBrevoStatus,
+  sendTestBrevoEmail,
 };

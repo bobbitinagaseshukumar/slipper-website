@@ -28,5 +28,7 @@ router.get('/campaigns', authenticateUser, requireAdmin, notificationController.
 router.post('/test-email', authenticateUser, requireAdmin, notificationController.sendTestEmail);
 router.get('/logs', authenticateUser, requireAdmin, notificationController.getEmailLogs);
 router.get('/subscribers', authenticateUser, requireAdmin, notificationController.getSubscribers);
+router.get('/brevo-status', authenticateUser, requireAdmin, notificationController.getBrevoStatus);
+router.post('/test-brevo', authenticateUser, requireAdmin, notificationController.sendTestBrevoEmail);
 
 module.exports = router;

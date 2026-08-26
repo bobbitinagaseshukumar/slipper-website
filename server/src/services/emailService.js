@@ -2,11 +2,12 @@ const prisma = require('../config/db');
 const { transporter, EMAIL_FROM, isConfigured } = require('../config/email');
 const emailTemplates = require('./emailTemplates');
 const storeSettingsService = require('./storeSettingsService');
+const brevoService = require('./brevoService');
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 /**
- * Core Dispatcher with Idempotency and Audit Logging
+ * Core Dispatcher with Idempotency, Audit Logging & Dual Provider Support (Brevo / SMTP)
  */
 const sendRawEmail = async ({
   recipient,
@@ -47,16 +48,34 @@ const sendRawEmail = async ({
     }
   }
 
-  // 3. Dispatch Email via Transporter
+  // 3. Dispatch Email via Brevo REST API (if configured) or Nodemailer Transporter
   try {
-    const mailOptions = {
-      from: EMAIL_FROM,
-      to: recipient,
-      subject,
-      html,
-    };
+    let messageId = null;
+    let providerName = 'SMTP';
 
-    const info = await transporter.sendMail(mailOptions);
+    if (brevoService.isBrevoConfigured()) {
+      const store = await storeSettingsService.getStoreSettings().catch(() => ({}));
+      const brevoRes = await brevoService.sendEmailViaBrevo({
+        to: recipient,
+        subject,
+        html,
+        senderName: store.storeName || undefined,
+        senderEmail: store.supportEmail || undefined,
+        tags: [emailType, category],
+      });
+      messageId = brevoRes.messageId;
+      providerName = 'BREVO_REST_API';
+    } else {
+      const mailOptions = {
+        from: EMAIL_FROM,
+        to: recipient,
+        subject,
+        html,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      messageId = info.messageId;
+    }
 
     // 4. Log Success in Database
     const log = await prisma.emailLog.create({
@@ -68,14 +87,14 @@ const sendRawEmail = async ({
         category,
         subject,
         status: 'SENT',
-        messageId: info.messageId || `msg-${Date.now()}`,
+        messageId: messageId || `msg-${Date.now()}`,
         relatedOrderId,
         relatedProductId,
         campaignId,
       },
     });
 
-    return { success: true, messageId: info.messageId, logId: log.id };
+    return { success: true, messageId, logId: log.id, provider: providerName };
   } catch (error) {
     console.error(`❌ Failed to dispatch ${emailType} email to ${recipient}:`, error.message);
 
@@ -115,6 +134,9 @@ const emailService = {
     if (!user?.email) return;
     setImmediate(async () => {
       try {
+        // Sync contact to Brevo list
+        await brevoService.syncContactToBrevo({ email: user.email, name: user.name });
+
         const store = await storeSettingsService.getStoreSettings();
         const storeName = store.storeName || 'AuraSole';
         const html = emailTemplates.welcomeTemplate({
