@@ -17,6 +17,7 @@ server/.env.*
 # Build Artifacts
 dist/
 build/
+public/
 client/dist/
 server/dist/
 
