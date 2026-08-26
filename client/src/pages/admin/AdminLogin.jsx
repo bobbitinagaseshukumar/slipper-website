@@ -19,7 +19,7 @@ import otpService from '../../services/otpService';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
-  const { login } = useAuth() || {};
+  const { login, loginWithToken } = useAuth() || {};
 
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');

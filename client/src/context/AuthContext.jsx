@@ -154,6 +154,13 @@ export const AuthProvider = ({ children }) => {
 
   const clearNotification = () => setAuthNotification(null);
 
+  const loginWithToken = (newToken, userData) => {
+    localStorage.setItem('aurasole_token', newToken);
+    localStorage.setItem('adminToken', newToken);
+    setToken(newToken);
+    if (userData) setUser(userData);
+  };
+
   const value = {
     user,
     token,
@@ -163,6 +170,7 @@ export const AuthProvider = ({ children }) => {
     authNotification,
     clearNotification,
     login,
+    loginWithToken,
     register,
     loginGoogle,
     loginFacebook,
