@@ -98,7 +98,7 @@ const calculateAuthoritativeCart = async (userId, itemsPayload, couponCode) => {
 
     if (coupon && coupon.isActive) {
       const now = new Date();
-      const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < now;
+      const isExpired = coupon.validUntil && new Date(coupon.validUntil) < now;
       const isLimitReached = coupon.usageLimit && coupon.usageCount >= coupon.usageLimit;
       const isBelowMinOrder = coupon.minOrderAmount && subtotal < coupon.minOrderAmount;
 

@@ -576,7 +576,7 @@ const createWhatsAppOrder = async (req, res, next) => {
             email: tempEmail,
             phone: effectiveWhatsApp || null,
             whatsappNumber: effectiveWhatsApp || null,
-            password: 'GUEST_WHATSAPP_ACCOUNT',
+            passwordHash: 'GUEST_WHATSAPP_ACCOUNT',
             role: 'CUSTOMER',
           },
         });
@@ -592,14 +592,14 @@ const createWhatsAppOrder = async (req, res, next) => {
       const addr = await prisma.address.findUnique({ where: { id: addressId } });
       if (addr) {
         effectiveAddressId = addr.id;
-        addressSnapshot = `${addr.fullName}, ${addr.addressLine1}${addr.addressLine2 ? ', ' + addr.addressLine2 : ''}, ${addr.city}, ${addr.state} - ${addr.pincode} (Phone: ${addr.phone})`;
+        addressSnapshot = `${addr.fullName}, ${addr.addressLine1}${addr.addressLine2 ? ', ' + addr.addressLine2 : ''}, ${addr.city}, ${addr.state} - ${addr.postalCode} (Phone: ${addr.phone})`;
       }
     }
 
     if (!addressSnapshot && guestAddress) {
       addressSnapshot = typeof guestAddress === 'string'
         ? guestAddress
-        : `${guestAddress.fullName || effectiveCustomerName}, ${guestAddress.addressLine1 || ''}${guestAddress.addressLine2 ? ', ' + guestAddress.addressLine2 : ''}, ${guestAddress.city || ''}, ${guestAddress.state || ''} - ${guestAddress.pincode || ''}`;
+        : `${guestAddress.fullName || effectiveCustomerName}, ${guestAddress.addressLine1 || ''}${guestAddress.addressLine2 ? ', ' + guestAddress.addressLine2 : ''}, ${guestAddress.city || ''}, ${guestAddress.state || ''} - ${guestAddress.postalCode || ''}`;
     }
 
     if (!addressSnapshot) {
@@ -626,7 +626,7 @@ const createWhatsAppOrder = async (req, res, next) => {
     });
 
     const storePhone = await whatsappService.getStoreWhatsAppNumber();
-    const whatsappUrl = whatsappService.buildWhatsAppUrl(storePhone, formattedMessage);
+    const whatsappUrl = whatsappService.generateWhatsAppUrl(storePhone, formattedMessage);
 
     // Save Order in Database with WHATSAPP_PENDING status
     const createdOrder = await prisma.$transaction(async (tx) => {
@@ -749,7 +749,7 @@ const createQuickProductWhatsAppOrder = async (req, res, next) => {
     const storePhone = await whatsappService.getStoreWhatsAppNumber();
     const customerName = req.user ? req.user.name : '';
 
-    const message = whatsappService.formatProductQuickWhatsAppMessage({
+    const message = whatsappService.formatProductQuickInquiryMessage({
       productName: product.name,
       size: size || variant?.size || 'Standard',
       color: color || variant?.colorName || 'Classic',
@@ -759,7 +759,7 @@ const createQuickProductWhatsAppOrder = async (req, res, next) => {
       customerName,
     });
 
-    const whatsappUrl = whatsappService.buildWhatsAppUrl(storePhone, message);
+    const whatsappUrl = whatsappService.generateWhatsAppUrl(storePhone, message);
 
     return successResponse(res, 'Product WhatsApp link generated', {
       whatsappUrl,
