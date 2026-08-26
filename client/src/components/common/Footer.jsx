@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ChevronDown,
   ShieldCheck,
+  Shield,
   Truck,
   RotateCcw,
   Headphones,
@@ -200,6 +201,9 @@ const Footer = () => {
           <Link to="/privacy-policy" className="hover:text-gray-400 transition-colors">Privacy Policy</Link>
           <Link to="/terms" className="hover:text-gray-400 transition-colors">Terms of Service</Link>
           <Link to="/shipping-policy" className="hover:text-gray-400 transition-colors">Shipping Info</Link>
+          <Link to="/admin/login" className="hover:text-luxury-accent transition-colors flex items-center gap-1 text-amber-400/90 font-bold">
+            <Shield className="w-3 h-3" /> Admin Portal
+          </Link>
         </div>
       </div>
     </footer>

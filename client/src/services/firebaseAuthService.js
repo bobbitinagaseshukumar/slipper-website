@@ -42,6 +42,8 @@ export const formatFirebaseAuthError = (error) => {
       return 'Network connection issue. Please check your internet connection and try again.';
     case 'auth/too-many-requests':
       return 'Too many unsuccessful attempts. Please wait a few moments before trying again.';
+    case 'auth/unauthorized-domain':
+      return 'Firebase domain authorization is propagating. Please use Email & Password Login below or try again in 2 minutes.';
     default:
       return error.message || 'Authentication failed. Please try again.';
   }

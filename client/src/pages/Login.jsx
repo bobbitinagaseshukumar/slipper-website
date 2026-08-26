@@ -386,6 +386,18 @@ const Login = () => {
               <Compass className="w-3.5 h-3.5" /> Continue as Guest
             </Link>
           </div>
+
+          {/* Dedicated Administrator Portal Access Button */}
+          <div className="mt-4 pt-3 border-t border-gray-100/80 flex items-center justify-center">
+            <Link
+              to="/admin/login"
+              className="w-full py-2.5 px-4 rounded-xl bg-luxury-dark hover:bg-luxury-accent text-white text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-sm group"
+            >
+              <Shield className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
+              <span>Store Administrator Login Portal</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
         </div>
       </div>
     </div>

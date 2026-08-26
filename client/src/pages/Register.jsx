@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight, AlertCircle, Loader2, Check, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, User, Phone, ArrowRight, AlertCircle, Loader2, Check, Sparkles, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useStoreSettings } from '../context/StoreSettingsContext';
 import FloatingSlipper3D from '../components/3d/FloatingSlipper3D';
@@ -423,7 +423,7 @@ const Register = () => {
           </form>
 
           {/* Login Link */}
-          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+          <div className="mt-8 pt-6 border-t border-gray-100 text-center space-y-3">
             <p className="text-xs text-gray-600">
               Already have an account?{' '}
               <Link
@@ -433,6 +433,17 @@ const Register = () => {
                 Sign In <ArrowRight className="w-3 h-3" />
               </Link>
             </p>
+
+            <div className="pt-2">
+              <Link
+                to="/admin/login"
+                className="w-full py-2.5 px-4 rounded-xl bg-luxury-dark hover:bg-luxury-accent text-white text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-sm group"
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform" />
+                <span>Store Administrator Login Portal</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
