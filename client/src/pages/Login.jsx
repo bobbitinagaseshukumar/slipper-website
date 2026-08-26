@@ -14,6 +14,7 @@ import {
   MapPin,
   Phone,
   MessageCircle,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useStoreSettings } from '../context/StoreSettingsContext';
