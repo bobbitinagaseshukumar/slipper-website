@@ -397,6 +397,29 @@ const mergeCart = async (req, res, next) => {
   }
 };
 
+/**
+ * Clear all items from current user's cart
+ */
+const clearCart = async (req, res, next) => {
+  try {
+    const cart = await prisma.cart.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    if (!cart) {
+      return successResponse(res, 'Cart is already empty');
+    }
+
+    await prisma.cartItem.deleteMany({
+      where: { cartId: cart.id },
+    });
+
+    return successResponse(res, 'Cart cleared successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCart,
   addToCart,
