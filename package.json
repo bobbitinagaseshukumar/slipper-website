@@ -1,0 +1,19 @@
+{
+  "name": "slipper-ecommerce-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Premium Dedicated Slipper E-Commerce Platform",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "build": "npm --prefix client run build && npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
+    "install:all": "npm install && npm --prefix client install && npm --prefix server install",
+    "seed": "npm --prefix server run prisma:seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

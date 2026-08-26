@@ -1,0 +1,817 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  SUSPENDED
+  DELETED
+}
+
+enum Gender {
+  MEN
+  WOMEN
+  KIDS
+  UNISEX
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+  WHATSAPP_PENDING
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  COD
+  ONLINE
+  RAZORPAY
+  UPI
+  CARD
+  NETBANKING
+  WHATSAPP
+}
+
+model User {
+  id               String          @id @default(uuid())
+  firebaseUid      String?         @unique
+  name             String
+  email            String          @unique
+  phone            String?         @unique
+  whatsappNumber   String?
+  passwordHash     String?
+  role             Role            @default(CUSTOMER)
+  status           UserStatus      @default(ACTIVE)
+  profileImage     String?
+  loginProvider    String?         @default("LOCAL")
+  isProfileComplete Boolean        @default(false)
+  welcomeEmailSentAt DateTime?
+  preferredSize    String?
+  preferredCategory String?
+  emailVerified    Boolean         @default(false)
+  phoneVerified    Boolean         @default(false)
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  addresses        Address[]
+  orders           Order[]
+  reviews          Review[]
+  cart             Cart?
+  wishlist         Wishlist?
+  notifications    Notification[]
+  sessions         UserSession[]
+  productViews     ProductView[]
+  searchHistories  SearchHistory[]
+  adminActivities  AdminActivity[]
+
+  @@index([email])
+  @@index([firebaseUid])
+  @@index([role])
+  @@index([status])
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName     String
+  phone        String
+  alternatePhone String?
+  addressLine1 String
+  addressLine2 String?
+  landmark     String?
+  city         String
+  state        String
+  postalCode   String
+  country      String   @default("India")
+  addressType  String   @default("HOME") // HOME, WORK, OTHER
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders       Order[]
+
+  @@index([userId])
+}
+
+model Category {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  slug         String        @unique
+  description  String?
+  image        String?
+  displayOrder Int           @default(0)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  subCategories SubCategory[]
+  products      Product[]
+
+  @@index([slug])
+  @@index([isActive])
+}
+
+model SubCategory {
+  id           String    @id @default(uuid())
+  categoryId   String
+  category     Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name         String
+  slug         String    @unique
+  description  String?
+  image        String?
+  displayOrder Int       @default(0)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  products     Product[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isActive])
+}
+
+model Product {
+  id                 String           @id @default(uuid())
+  name               String
+  slug               String           @unique
+  sku                String?          @unique
+  brand              String           @default("AuraSole")
+  shortDescription   String?
+  description        String
+  categoryId         String
+  category           Category         @relation(fields: [categoryId], references: [id])
+  subcategoryId      String?
+  subcategory        SubCategory?     @relation(fields: [subcategoryId], references: [id])
+  gender             Gender           @default(UNISEX)
+  ageGroup           String           @default("Adult") // Adult, Kids, Teen
+  productType        String           @default("Slides") // Slides, Flip Flops, Comfort Slippers, Daily Wear, Bathroom Slippers, Orthopedic, Home Slippers, Leather Luxury
+  material           String?          // EVA, Memory Foam, Genuine Leather, Rubber, Cork, Canvas
+  soleMaterial       String?          // Non-slip EVA, Anti-skid Rubber, Ergonomic Air Sole
+  upperMaterial      String?
+  style              String?
+  occasion           String?          @default("Casual") // Casual, Home, Outdoor, Beach, Spa, Daily
+  pattern            String?          // Solid, Textured, Striped, Graphic
+  comfortFeatures    String?          // Arch support, Memory foam cushion, Shock absorption, Massage footbed
+  careInstructions   String?          // Wipe with damp cloth, avoid direct sunlight
+  price              Float
+  originalPrice      Float?
+  discountPercentage Float?           @default(0)
+  stock              Int              @default(50)
+  rating             Float            @default(5.0)
+  reviewCount        Int              @default(0)
+  isFeatured         Boolean          @default(false)
+  isTrending         Boolean          @default(false)
+  isNewArrival       Boolean          @default(true)
+  isBestSeller       Boolean          @default(false)
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  images             ProductImage[]
+  variants           ProductVariant[]
+  cartItems          CartItem[]
+  wishlistItems      WishlistItem[]
+  orderItems         OrderItem[]
+  reviews            Review[]
+  inventories        Inventory[]
+  productViews       ProductView[]
+  homepageSections   HomepageSectionProduct[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([gender])
+  @@index([price])
+  @@index([rating])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([isTrending])
+  @@index([isNewArrival])
+  @@index([isBestSeller])
+  @@index([createdAt])
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model ProductVariant {
+  id            String      @id @default(uuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size          String      // e.g. "6", "7", "8", "9", "10", "11", "12"
+  colorName     String      // e.g. "Obsidian Black", "Mocha Brown", "Cloud White"
+  colorCode     String?     // e.g. "#1A1A1A", "#5C4033", "#F5F5F5"
+  sku           String?     @unique
+  stock         Int         @default(20)
+  priceOverride Float?
+  image         String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+
+  @@index([productId])
+  @@index([size])
+  @@index([colorName])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String          @id @default(uuid())
+  cartId    String
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  size      String?
+  color     String?
+  quantity  Int             @default(1)
+  price     Float
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([cartId])
+  @@index([productId])
+}
+
+model Wishlist {
+  id        String         @id @default(uuid())
+  userId    String         @unique
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  items     WishlistItem[]
+}
+
+model WishlistItem {
+  id         String   @id @default(uuid())
+  wishlistId String
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([wishlistId, productId])
+  @@index([wishlistId])
+  @@index([productId])
+}
+
+model Order {
+  id                  String        @id @default(uuid())
+  orderNumber         String        @unique
+  userId              String
+  user                User          @relation(fields: [userId], references: [id])
+  addressId           String?
+  address             Address?      @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  deliveryAddressSnapshot String?
+  status              OrderStatus   @default(PENDING)
+  totalAmount         Float
+  discountAmount      Float         @default(0)
+  shippingAmount      Float         @default(0)
+  finalAmount         Float
+  paymentMethod       PaymentMethod @default(COD)
+  paymentStatus       PaymentStatus @default(PENDING)
+  notes               String?
+  trackingNumber      String?
+  razorpayOrderId     String?       @unique
+  razorpayPaymentId   String?
+  razorpaySignature   String?
+  isWhatsAppOrder     Boolean       @default(false)
+  whatsappMessage     String?
+  deliveryDate        DateTime?
+  cancellationDeadline DateTime?
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  items               OrderItem[]
+  payments            Payment[]
+
+  @@index([orderNumber])
+  @@index([userId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([razorpayOrderId])
+  @@index([isWhatsAppOrder])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          String          @id @default(uuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id])
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
+  productName String
+  size        String?
+  color       String?
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  createdAt   DateTime        @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  transactionId     String?
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  razorpaySignature String?
+  paymentMethod     PaymentMethod
+  amount            Float
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  rawResponse       String?
+  verifiedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([razorpayOrderId])
+  @@index([razorpayPaymentId])
+  @@index([status])
+}
+
+model Review {
+  id                 String   @id @default(uuid())
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId            String?
+  rating             Int      @default(5)
+  title              String?
+  comment            String
+  images             String[] @default([])
+  isVerifiedPurchase Boolean  @default(true)
+  isApproved         Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([productId])
+  @@index([userId])
+  @@index([orderId])
+  @@index([rating])
+}
+
+model Coupon {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  description    String?
+  discountType   String    @default("PERCENTAGE") // PERCENTAGE or FLAT
+  discountValue  Float
+  minOrderAmount Float     @default(0)
+  maxDiscount    Float?
+  usageLimit     Int?
+  usageCount     Int       @default(0)
+  validFrom      DateTime  @default(now())
+  validUntil     DateTime
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model Banner {
+  id           String   @id @default(uuid())
+  title        String
+  subtitle     String?
+  tagline      String?
+  image        String
+  mobileImage  String?
+  link         String?
+  ctaText      String?  @default("Shop Now")
+  badge        String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([displayOrder])
+}
+
+model HomepageSection {
+  id           String    @id @default(uuid())
+  title        String
+  subtitle     String?
+  type         String    // HERO_BANNER, CATEGORY_GRID, NEW_ARRIVALS, TRENDING, MENS_COLLECTION, WOMENS_COLLECTION, KIDS_COLLECTION, COMFORT_STORY, SPECIAL_OFFER, REVIEWS
+  displayOrder Int       @default(0)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  products     HomepageSectionProduct[]
+
+  @@index([type])
+  @@index([isActive])
+}
+
+model HomepageSectionProduct {
+  id         String          @id @default(uuid())
+  sectionId  String
+  section    HomepageSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sortOrder  Int             @default(0)
+
+  @@unique([sectionId, productId])
+  @@index([sectionId])
+  @@index([productId])
+}
+
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+model StoreSettings {
+  id                        String    @id @default(uuid())
+  storeName                 String    @default("AuraSole")
+  tagline                   String    @default("Walk With Pure Luxury")
+  description               String    @default("Handcrafted orthotic and luxury comfort slippers engineered for effortless daily elegance.")
+  logo                      String?
+  favicon                   String?
+  contactEmail              String    @default("support@aurasole.com")
+  supportEmail              String    @default("support@aurasole.com")
+  phone                     String    @default("+91 98765 43210")
+  whatsappNumber            String    @default("+91 98765 43210")
+  address                   String    @default("Showroom 42, Slipper Heritage Lane, Luxury Avenue, Mumbai - 400001")
+  businessHours             String    @default("Mon - Sat: 9:00 AM - 9:00 PM | Sun: 10:00 AM - 7:00 PM")
+  currency                  String    @default("INR")
+  currencySymbol            String    @default("₹")
+  timezone                  String    @default("Asia/Kolkata")
+  websiteUrl                String    @default("https://aurasole.com")
+  facebookUrl               String?
+  instagramUrl              String?
+  youtubeUrl                String?
+  twitterUrl                String?
+  footerText                String    @default("Experience next-generation footwear ergonomics with our signature arch-cradling soles.")
+  copyrightText             String    @default("All Rights Reserved.")
+  announcementActive        Boolean   @default(true)
+  announcementMessage       String    @default("🔥 Festival Sale Live — Up to 50% OFF Signature Slippers | Express Free Shipping Across India")
+  announcementLink          String?   @default("/shop")
+  estimatedDeliveryDays     String    @default("3-5 Business Days")
+  cancellationDeadlineHours Int       @default(24)
+  freeShippingThreshold     Float     @default(999)
+  standardShippingFee       Float     @default(99)
+  maintenanceMode           Boolean   @default(false)
+
+  // Login Page Controls
+  loginTitle                String    @default("Welcome Back")
+  loginSubtitle             String    @default("Step into your personalized comfort showroom and orders.")
+  loginWelcomeMessage       String    @default("Doctor-Engineered Cloud Slippers • Handcrafted Daily Luxury")
+  loginBgImage              String?
+  loginShowAddress          Boolean   @default(true)
+  loginShowPhone            Boolean   @default(true)
+  loginShowWhatsApp         Boolean   @default(true)
+  loginShowEmail            Boolean   @default(true)
+  loginGoogleEnabled        Boolean   @default(true)
+  loginFacebookEnabled      Boolean   @default(true)
+
+  // Register Page Controls
+  registerTitle             String    @default("Create Your Account")
+  registerSubtitle          String    @default("Join for exclusive slipper drops & priority shipping.")
+  registerWelcomeMessage    String    @default("Handcrafted luxury comfort engineered for everyday elegance.")
+  registerPhoneRequired     Boolean   @default(true)
+  registerWhatsAppRequired  Boolean   @default(false)
+
+  // Checkout Controls
+  checkoutTitle             String    @default("Secure Slipper Checkout")
+  checkoutInstructions      String    @default("All orders include 7-Day Doorstep Replacement Guarantee & Real-time Courier Tracking.")
+  checkoutTrustBadge        String    @default("🔒 256-Bit SSL Encrypted • 100% Genuine Orthopedic Footwear")
+  razorpayEnabled           Boolean   @default(true)
+  whatsappOrderEnabled      Boolean   @default(true)
+
+  // SEO & Meta
+  metaTitle                 String    @default("AuraSole — Premium Slipper Showroom & Ergonomic Footwear")
+  metaDescription           String    @default("Discover doctor-engineered recovery slides, orthopedic slippers, and daily luxury flip-flops.")
+  metaKeywords              String    @default("slippers, slides, orthopedic slippers, luxury footwear, recovery slides, comfort footwear")
+  ogImage                   String?
+
+  // Promotional Popups
+  popupActive               Boolean   @default(false)
+  popupTitle                String    @default("Limited Slipper Drop 🔥")
+  popupMessage              String    @default("Use code COMFORT15 on checkout for an exclusive 15% discount on all cloud recovery slides.")
+  popupImage                String?
+  popupLink                 String    @default("/shop")
+  popupCtaText              String    @default("Shop Slipper Deals")
+
+  // About & Brand Story
+  aboutStory                String    @default("AuraSole was founded with a singular mission: to eliminate daily foot fatigue by engineering the perfect balance of orthotic arch support and cloud-like cushioning.")
+  aboutMission              String    @default("To handcraft India's most comfortable, doctor-approved daily recovery slippers.")
+  aboutVision               String    @default("To elevate everyday indoor and outdoor footwear into a premium wellness experience.")
+  contactMapEmbed           String?
+
+  // Dynamic Policies
+  privacyPolicyHtml         String?
+  termsHtml                 String?
+  returnPolicyHtml          String?
+  shippingPolicyHtml        String?
+
+  updatedAt                 DateTime  @updatedAt
+  updatedBy                 String?
+}
+
+model Notification {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  message         String
+  type            String   @default("INFO") // ORDER, PROMO, SYSTEM, SECURITY
+  severity        String   @default("INFO") // INFO, WARNING, CRITICAL
+  isSecurityAlert Boolean  @default(false)
+  link            String?
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([isSecurityAlert])
+}
+
+model UserSession {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionToken   String    @unique
+  deviceType     String    @default("Desktop") // "Mobile", "Desktop", "Tablet"
+  deviceName     String    @default("Computer") // "Android Phone", "Windows PC", "iPhone", "Mac"
+  browser        String    @default("Chrome")
+  os             String    @default("Windows")
+  ipAddress      String?
+  userAgent      String?
+  lastActivityAt DateTime  @default(now())
+  expiresAt      DateTime
+  isRevoked      Boolean   @default(false)
+  revokedAt      DateTime?
+  revokedReason  String?   // "USER_LOGOUT", "ALL_DEVICES_LOGOUT", "PASSWORD_CHANGE", "ADMIN_FORCE_LOGOUT", "INACTIVITY_EXPIRY"
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([isRevoked])
+  @@index([lastActivityAt])
+  @@index([expiresAt])
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity    Int      @default(0)
+  lowStockAlert Int    @default(5)
+  lastRestocked DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+}
+
+model ProductView {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipAddress String?
+  viewedAt  DateTime @default(now())
+
+  @@index([productId])
+  @@index([userId])
+}
+
+model SearchHistory {
+  id        String   @id @default(uuid())
+  query     String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([query])
+  @@index([userId])
+}
+
+model AdminActivity {
+  id        String   @id @default(uuid())
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+}
+
+model EmailSubscription {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  userId          String?
+  subscribed      Boolean   @default(true)
+  promoEmails     Boolean   @default(true)
+  newProducts     Boolean   @default(true)
+  festivalDeals   Boolean   @default(true)
+  coupons         Boolean   @default(true)
+  flashSales      Boolean   @default(true)
+  specialOffers   Boolean   @default(true)
+  unsubscribeToken String   @unique @default(uuid())
+  source          String    @default("WEBSITE")
+  subscribedAt    DateTime  @default(now())
+  unsubscribedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([email])
+  @@index([subscribed])
+}
+
+model EmailLog {
+  id               String    @id @default(uuid())
+  idempotencyKey   String?   @unique
+  recipient        String
+  userId           String?
+  emailType        String
+  category         String    @default("TRANSACTIONAL") // TRANSACTIONAL, PROMOTIONAL
+  subject          String
+  status           String    @default("SENT") // SENT, FAILED, SKIPPED
+  messageId        String?
+  error            String?
+  relatedOrderId   String?
+  relatedProductId String?
+  campaignId       String?
+  sentAt           DateTime  @default(now())
+
+  @@index([recipient])
+  @@index([idempotencyKey])
+  @@index([emailType])
+  @@index([status])
+}
+
+model EmailCampaign {
+  id              String    @id @default(uuid())
+  title           String
+  type            String    // NEW_PRODUCT, FESTIVAL_DEAL, COUPON, FLASH_SALE, SPECIAL_OFFER, CUSTOM
+  subject         String
+  headline        String?
+  message         String
+  imageUrl        String?
+  ctaText         String?
+  ctaUrl          String?
+  targetAudience  String    @default("ALL_SUBSCRIBERS")
+  recipientCount  Int       @default(0)
+  successCount    Int       @default(0)
+  failedCount     Int       @default(0)
+  status          String    @default("DRAFT") // DRAFT, SENDING, COMPLETED, FAILED
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([type])
+  @@index([status])
+}
+
+model OTPVerification {
+  id             String    @id @default(uuid())
+  email          String
+  userId         String?
+  purpose        String    @default("LOGIN") // LOGIN, ADMIN_LOGIN, REGISTRATION, EMAIL_CHANGE, PASSWORD_RESET, SECURITY_ACTION
+  otpHash        String
+  expiresAt      DateTime
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(5)
+  isUsed         Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  verifiedAt     DateTime?
+  invalidatedAt  DateTime?
+
+  @@index([email])
+  @@index([purpose])
+  @@index([isUsed])
+  @@index([expiresAt])
+}
+
+model Offer {
+  id             String    @id @default(uuid())
+  title          String
+  code           String?
+  discountType   String    @default("PERCENTAGE") // PERCENTAGE, FIXED
+  discountValue  Float
+  bannerUrl      String?
+  description    String?
+  badgeText      String?
+  startDate      DateTime?
+  endDate        DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+model FestivalDeal {
+  id                 String    @id @default(uuid())
+  festivalName       String
+  title              String
+  description        String?
+  bannerUrl          String?
+  discountPercentage Float
+  startDate          DateTime
+  endDate            DateTime
+  couponCode         String?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+model FlashSale {
+  id                 String    @id @default(uuid())
+  title              String
+  discountPercentage Float
+  startTime          DateTime
+  endTime            DateTime
+  stockLimit         Int       @default(50)
+  bannerUrl          String?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([endTime])
+}
