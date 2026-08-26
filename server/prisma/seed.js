@@ -12,7 +12,26 @@ async function main() {
   const legacyAdminPassword = await bcrypt.hash('Admin@12345', salt);
   const customerPassword = await bcrypt.hash('Customer@12345', salt);
 
-  const admin = await prisma.user.upsert({
+  const admin1 = await prisma.user.upsert({
+    where: { email: 'nagaseshukumarbobbiti@gmail.com' },
+    update: {
+      passwordHash: newAdminPassword,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    },
+    create: {
+      name: 'Seshu Kumar (Super Admin)',
+      email: 'nagaseshukumarbobbiti@gmail.com',
+      phone: '+919999977777',
+      passwordHash: newAdminPassword,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      emailVerified: true,
+      phoneVerified: true,
+    },
+  });
+
+  const admin2 = await prisma.user.upsert({
     where: { email: 'nagaseshukumatbobbiti@gmail.com' },
     update: {
       passwordHash: newAdminPassword,
@@ -35,7 +54,7 @@ async function main() {
   await prisma.user.upsert({
     where: { email: 'admin@aurasole.com' },
     update: {
-      passwordHash: legacyAdminPassword,
+      passwordHash: newAdminPassword,
       role: 'ADMIN',
       status: 'ACTIVE',
     },
@@ -43,7 +62,7 @@ async function main() {
       name: 'Store Administrator',
       email: 'admin@aurasole.com',
       phone: '+919876543211',
-      passwordHash: legacyAdminPassword,
+      passwordHash: newAdminPassword,
       role: 'ADMIN',
       status: 'ACTIVE',
       emailVerified: true,

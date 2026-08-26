@@ -59,13 +59,16 @@ const Login = () => {
     setIsSubmitting(true);
     try {
       const res = await login(email, password);
-      if (res?.data?.isProfileComplete === false) {
+      const role = res?.data?.user?.role;
+      if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+        navigate('/admin', { replace: true });
+      } else if (res?.data?.isProfileComplete === false) {
         navigate('/onboarding', { replace: true });
       } else {
         navigate(from, { replace: true });
       }
     } catch (err) {
-      setError(err.message || 'Invalid email or password. Please try again.');
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setIsSubmitting(false);
     }
@@ -78,7 +81,10 @@ const Login = () => {
 
     try {
       const data = await loginGoogle();
-      if (data?.isNewCustomer || data?.isProfileComplete === false) {
+      const role = data?.user?.role;
+      if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+        navigate('/admin', { replace: true });
+      } else if (data?.isNewCustomer || data?.isProfileComplete === false) {
         navigate('/onboarding', { replace: true });
       } else {
         navigate(from, { replace: true });
@@ -97,7 +103,10 @@ const Login = () => {
 
     try {
       const data = await loginFacebook();
-      if (data?.isNewCustomer || data?.isProfileComplete === false) {
+      const role = data?.user?.role;
+      if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+        navigate('/admin', { replace: true });
+      } else if (data?.isNewCustomer || data?.isProfileComplete === false) {
         navigate('/onboarding', { replace: true });
       } else {
         navigate(from, { replace: true });
