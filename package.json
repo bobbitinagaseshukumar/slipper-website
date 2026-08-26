@@ -15,6 +15,8 @@
     "build": "npm --prefix client run build",
     "build:client": "npm --prefix client run build",
     "build:server": "npm --prefix server run build",
+    "start": "node server/src/server.js",
+    "start:server": "node server/src/server.js",
     "install:all": "npm install",
     "seed": "npm --prefix server run prisma:seed"
   },
