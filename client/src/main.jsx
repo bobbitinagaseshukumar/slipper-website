@@ -8,18 +8,22 @@ import { StoreSettingsProvider } from './context/StoreSettingsContext';
 import App from './App';
 import './index.css';
 
+import ErrorBoundary from './components/common/ErrorBoundary';
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <StoreSettingsProvider>
-        <AuthProvider>
-          <CartProvider>
-            <WishlistProvider>
-              <App />
-            </WishlistProvider>
-          </CartProvider>
-        </AuthProvider>
-      </StoreSettingsProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <StoreSettingsProvider>
+          <AuthProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <App />
+              </WishlistProvider>
+            </CartProvider>
+          </AuthProvider>
+        </StoreSettingsProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 );
