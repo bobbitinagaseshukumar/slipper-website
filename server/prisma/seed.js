@@ -8,17 +8,42 @@ async function main() {
 
   // 1. Create Default Users (Admin & Customer)
   const salt = await bcrypt.genSalt(10);
-  const adminPassword = await bcrypt.hash('Admin@12345', salt);
+  const newAdminPassword = await bcrypt.hash('seshu@2409slippers', salt);
+  const legacyAdminPassword = await bcrypt.hash('Admin@12345', salt);
   const customerPassword = await bcrypt.hash('Customer@12345', salt);
 
   const admin = await prisma.user.upsert({
+    where: { email: 'nagaseshukumatbobbiti@gmail.com' },
+    update: {
+      passwordHash: newAdminPassword,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    },
+    create: {
+      name: 'Seshu Kumar (Super Admin)',
+      email: 'nagaseshukumatbobbiti@gmail.com',
+      phone: '+919999988888',
+      passwordHash: newAdminPassword,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      emailVerified: true,
+      phoneVerified: true,
+    },
+  });
+
+  // Keep legacy admin as backup
+  await prisma.user.upsert({
     where: { email: 'admin@aurasole.com' },
-    update: {},
+    update: {
+      passwordHash: legacyAdminPassword,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    },
     create: {
       name: 'Store Administrator',
       email: 'admin@aurasole.com',
-      phone: '+919876543210',
-      passwordHash: adminPassword,
+      phone: '+919876543211',
+      passwordHash: legacyAdminPassword,
       role: 'ADMIN',
       status: 'ACTIVE',
       emailVerified: true,
@@ -41,7 +66,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Users seeded (Admin: admin@aurasole.com / Admin@12345, Customer: customer@example.com / Customer@12345)');
+  console.log('✅ Users seeded (Super Admin: nagaseshukumatbobbiti@gmail.com / seshu@2409slippers)');
 
   // 2. Create Site Settings
   const settings = [
