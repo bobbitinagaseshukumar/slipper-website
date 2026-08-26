@@ -135,9 +135,12 @@ const requireRole = (allowedRoles = ['ADMIN', 'SUPER_ADMIN']) => {
     next();
   };
 };
+// Pre-configured admin-only middleware
+const requireAdmin = requireRole(['ADMIN', 'SUPER_ADMIN']);
 
 module.exports = {
   authenticateUser,
   optionalAuth,
   requireRole,
+  requireAdmin,
 };

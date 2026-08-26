@@ -766,6 +766,10 @@ const getAdminAuditLogs = async (req, res, next) => {
     });
     return successResponse(res, 'Audit logs retrieved', logs);
   } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * 9. Subcategories Management
  */
