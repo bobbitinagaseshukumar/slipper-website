@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const AccountSidebar = ({ activeTab, onSelectTab }) => {
+const AccountSidebar = ({ activeTab, onSelectTab, unreadNotificationsCount = 0 }) => {
   const { user, logout } = useAuth();
 
   const navItems = [
@@ -27,7 +27,7 @@ const AccountSidebar = ({ activeTab, onSelectTab }) => {
     { id: 'addresses', label: 'Delivery Addresses', icon: MapPin },
     { id: 'reviews', label: 'My Reviews', icon: Star },
     { id: 'recently-viewed', label: 'Recently Viewed', icon: Clock },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotificationsCount },
     { id: 'coupons', label: 'Active Coupons', icon: Tag },
     { id: 'security', label: 'Security & Password', icon: Shield },
     { id: 'help', label: 'Help & FAQs', icon: HelpCircle },
@@ -77,18 +77,25 @@ const AccountSidebar = ({ activeTab, onSelectTab }) => {
               key={item.id}
               type="button"
               onClick={() => onSelectTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                 isActive
                   ? 'bg-luxury-dark text-white shadow-md'
                   : 'text-gray-600 hover:bg-luxury-warmWhite hover:text-luxury-dark'
               }`}
             >
-              <Icon
-                className={`w-4 h-4 shrink-0 ${
-                  isActive ? 'text-luxury-accent' : 'text-gray-400 group-hover:text-luxury-dark'
-                }`}
-              />
-              <span>{item.label}</span>
+              <div className="flex items-center gap-3">
+                <Icon
+                  className={`w-4 h-4 shrink-0 ${
+                    isActive ? 'text-luxury-accent' : 'text-gray-400 group-hover:text-luxury-dark'
+                  }`}
+                />
+                <span>{item.label}</span>
+              </div>
+              {item.badge > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse">
+                  {item.badge}
+                </span>
+              )}
             </button>
           );
         })}

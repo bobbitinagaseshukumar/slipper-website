@@ -55,6 +55,7 @@ import addressService from '../services/addressService';
 import notificationService from '../services/notificationService';
 import couponService from '../services/couponService';
 import reviewService from '../services/reviewService';
+import productService from '../services/productService';
 
 import Header from '../components/common/Header';
 import AnnouncementBar from '../components/common/AnnouncementBar';
@@ -281,8 +282,17 @@ const Account = () => {
     }
   };
 
-  // Load Recently Viewed from localStorage
-  const loadRecentViews = () => {
+  // Load Recently Viewed from Neon PostgreSQL database with localStorage fallback
+  const loadRecentViews = async () => {
+    try {
+      const res = await productService.getRecentlyViewed();
+      if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+        setRecentViews(res.data.slice(0, 20));
+        return;
+      }
+    } catch (err) {
+      console.warn('Could not load recently viewed from server:', err);
+    }
     const stored = JSON.parse(localStorage.getItem('aurasole_recent_views') || '[]');
     setRecentViews(stored.slice(0, 20));
   };
@@ -579,7 +589,11 @@ const Account = () => {
         {/* Desktop Sidebar + Content Layout */}
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           <div className="hidden lg:block">
-            <AccountSidebar activeTab={currentTab} onSelectTab={handleSelectTab} />
+            <AccountSidebar
+              activeTab={currentTab}
+              onSelectTab={handleSelectTab}
+              unreadNotificationsCount={unreadNotificationsCount}
+            />
           </div>
 
           {/* Main Sub-tab Content Area */}
