@@ -2,6 +2,7 @@ const prisma = require('../config/db');
 const emailService = require('../services/emailService');
 const whatsappService = require('../services/whatsappService');
 const paymentService = require('../services/paymentService');
+const storeSettingsService = require('../services/storeSettingsService');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 
 /**
@@ -96,8 +97,11 @@ const createOrder = async (req, res, next) => {
       });
     }
 
-    // 4. Calculate Delivery Fee (Free on orders >= ₹999, else ₹49)
-    const deliveryFee = subtotal >= 999 ? 0 : 49;
+    // 4. Calculate Delivery Fee (Dynamically configured by Admin in StoreSettings)
+    const storeSettings = await storeSettingsService.getStoreSettings();
+    const freeThreshold = typeof storeSettings.freeShippingThreshold === 'number' ? storeSettings.freeShippingThreshold : 999;
+    const standardFee = typeof storeSettings.standardShippingFee === 'number' ? storeSettings.standardShippingFee : 49;
+    const deliveryFee = subtotal >= freeThreshold || subtotal === 0 ? 0 : standardFee;
 
     // 5. Authoritative Coupon Validation & Discount
     let discountAmount = 0;
@@ -780,7 +784,7 @@ const createWhatsAppOrder = async (req, res, next) => {
         },
       });
 
-      // Record items
+      // Record items and decrement stock
       for (const item of verifiedItems) {
         await tx.orderItem.create({
           data: {
@@ -795,7 +799,43 @@ const createWhatsAppOrder = async (req, res, next) => {
             totalPrice: item.totalPrice,
           },
         });
+
+        // Decrement Variant Stock
+        if (item.variantId) {
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+
+        // Decrement Product Stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
       }
+
+      // Initial Status History
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: 'WHATSAPP_PENDING',
+          actorRole: 'CUSTOMER',
+          actorId: targetUserId,
+          comment: 'WhatsApp order initiated by customer.',
+        },
+      });
+
+      // Create Admin Red Alert Notification
+      await tx.adminNotification.create({
+        data: {
+          type: 'NEW_ORDER',
+          title: `🔴 NEW WHATSAPP ORDER: #${orderNumber}`,
+          message: `New WhatsApp order request for ₹${finalAmount} from ${effectiveCustomerName}.`,
+          orderId: order.id,
+          customerId: targetUserId,
+        },
+      });
 
       // Record coupon usage
       if (appliedCoupon) {
@@ -803,6 +843,12 @@ const createWhatsAppOrder = async (req, res, next) => {
           where: { id: appliedCoupon.id },
           data: { usageCount: { increment: 1 } },
         });
+      }
+
+      // Clear customer's cart if exists
+      const userCart = await tx.cart.findUnique({ where: { userId: targetUserId } });
+      if (userCart) {
+        await tx.cartItem.deleteMany({ where: { cartId: userCart.id } });
       }
 
       // Create in-app notification

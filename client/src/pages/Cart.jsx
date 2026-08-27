@@ -19,6 +19,7 @@ import {
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useAuth } from '../context/AuthContext';
+import { useStoreSettings } from '../context/StoreSettingsContext';
 import couponService from '../services/couponService';
 
 import Header from '../components/common/Header';
@@ -32,6 +33,7 @@ const Cart = () => {
   const { cart, itemCount, subtotal, originalSubtotal, savings, updateQuantity, removeItem } = useCart();
   const { toggleWishlist } = useWishlist();
   const { isAuthenticated } = useAuth();
+  const { settings } = useStoreSettings();
   const navigate = useNavigate();
 
   const [couponCode, setCouponCode] = useState('');
@@ -40,9 +42,10 @@ const Cart = () => {
   const [couponError, setCouponError] = useState(null);
   const [couponSuccess, setCouponSuccess] = useState(null);
 
-  // Delivery calculation: Free for ₹999+, else ₹49
-  const deliveryFee = subtotal >= 999 || subtotal === 0 ? 0 : 49;
-  const freeShippingThreshold = 999;
+  // Dynamic Delivery calculation from Admin StoreSettings
+  const freeShippingThreshold = settings?.freeShippingThreshold ?? 999;
+  const standardFee = settings?.standardShippingFee ?? 49;
+  const deliveryFee = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : standardFee;
   const amountNeededForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const freeShippingProgress = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
 

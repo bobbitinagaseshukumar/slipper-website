@@ -191,6 +191,31 @@ export const CartProvider = ({ children }) => {
     }
   };
 
+  const clearCart = () => {
+    setCart({
+      items: [],
+      itemCount: 0,
+      subtotal: 0,
+      originalSubtotal: 0,
+      savings: 0,
+      freeDeliveryEligible: false,
+    });
+    localStorage.removeItem('aurasole_guest_cart');
+  };
+
+  const refreshCart = async () => {
+    if (isAuthenticated) {
+      try {
+        const res = await cartService.getCart();
+        if (res?.data) {
+          setCart(res.data);
+        }
+      } catch (e) {
+        console.warn('Failed to refresh cart:', e);
+      }
+    }
+  };
+
   const value = {
     cart,
     itemCount: cart.itemCount || 0,
@@ -203,6 +228,9 @@ export const CartProvider = ({ children }) => {
     addToCart,
     updateQuantity,
     removeItem,
+    clearCart,
+    refreshCart,
+    fetchCart: refreshCart,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

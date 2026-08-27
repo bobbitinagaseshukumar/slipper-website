@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const storeSettingsService = require('../services/storeSettingsService');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 
 /**
@@ -83,6 +84,12 @@ const getCart = async (req, res, next) => {
 
     const savings = Math.max(0, originalSubtotal - subtotal);
 
+    // Dynamic Shipping from Admin StoreSettings
+    const storeSettings = await storeSettingsService.getStoreSettings();
+    const freeThreshold = typeof storeSettings.freeShippingThreshold === 'number' ? storeSettings.freeShippingThreshold : 999;
+    const standardFee = typeof storeSettings.standardShippingFee === 'number' ? storeSettings.standardShippingFee : 49;
+    const deliveryFee = subtotal >= freeThreshold || subtotal === 0 ? 0 : standardFee;
+
     return successResponse(res, 'Cart retrieved', {
       cartId: cart.id,
       items: formattedItems,
@@ -90,7 +97,10 @@ const getCart = async (req, res, next) => {
       subtotal,
       originalSubtotal,
       savings,
-      freeDeliveryEligible: subtotal >= 999,
+      freeShippingThreshold: freeThreshold,
+      standardShippingFee: standardFee,
+      deliveryFee,
+      freeDeliveryEligible: subtotal >= freeThreshold,
     });
   } catch (error) {
     next(error);

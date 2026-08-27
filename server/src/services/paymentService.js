@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const prisma = require('../config/db');
 const { razorpayInstance, RAZORPAY_KEY_SECRET, isConfigured } = require('../config/razorpay');
 const emailService = require('./emailService');
+const storeSettingsService = require('./storeSettingsService');
 
 /**
  * Authoritative Backend Price, Stock, & Coupon Calculation
@@ -84,8 +85,11 @@ const calculateAuthoritativeCart = async (userId, itemsPayload, couponCode) => {
     });
   }
 
-  // Delivery Fee Calculation (Free delivery over ₹999, else ₹49)
-  const deliveryFee = subtotal >= 999 ? 0 : 49;
+  // Delivery Fee Calculation (Dynamically configured by Admin in StoreSettings)
+  const storeSettings = await storeSettingsService.getStoreSettings();
+  const freeThreshold = typeof storeSettings.freeShippingThreshold === 'number' ? storeSettings.freeShippingThreshold : 999;
+  const standardFee = typeof storeSettings.standardShippingFee === 'number' ? storeSettings.standardShippingFee : 49;
+  const deliveryFee = subtotal >= freeThreshold || subtotal === 0 ? 0 : standardFee;
 
   // Coupon Validation
   let discountAmount = 0;
@@ -313,6 +317,28 @@ const fulfillPaidOrder = async ({
         data: { usageCount: { increment: 1 } },
       });
     }
+
+    // Initial Status History
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        status: 'CONFIRMED',
+        actorRole: 'CUSTOMER',
+        actorId: userId,
+        comment: 'Online payment captured and verified via Razorpay gateway.',
+      },
+    });
+
+    // Create Admin Red Alert Notification
+    await tx.adminNotification.create({
+      data: {
+        type: 'NEW_ORDER',
+        title: `🔴 PAID ORDER: #${orderNumber}`,
+        message: `Online payment received for ₹${finalAmount}. Order is ready for fulfillment!`,
+        orderId: order.id,
+        customerId: userId,
+      },
+    });
 
     // Clear User's Cart
     const userCart = await tx.cart.findUnique({ where: { userId } });
