@@ -88,4 +88,13 @@ router.post('/sections/reorder', adminController.reorderAdminSections);
 router.post('/sections/:id/products', adminController.assignProductToSection);
 router.delete('/sections/:id/products/:productId', adminController.removeProductFromSection);
 
+// 14. Custom Registration Fields & Authentication Controls
+router.get('/registration-fields', adminController.getAdminCustomFields);
+router.post('/registration-fields', adminController.createCustomField);
+router.put('/registration-fields/:id', adminController.updateCustomField);
+router.delete('/registration-fields/:id', adminController.deleteCustomField);
+router.post('/registration-fields/reorder', adminController.reorderCustomFields);
+router.put('/customers/:id/profile', adminController.updateCustomerProfileAdmin);
+router.get('/auth-logs', adminController.getAuthAuditLogs);
+
 module.exports = router;

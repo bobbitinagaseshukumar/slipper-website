@@ -57,6 +57,7 @@ import AdminCategoryManager from '../../components/admin/AdminCategoryManager';
 import AdminBrandManager from '../../components/admin/AdminBrandManager';
 import AdminProductModal from '../../components/admin/AdminProductModal';
 import AdminSectionManager from '../../components/admin/AdminSectionManager';
+import AdminCustomFieldManager from '../../components/admin/AdminCustomFieldManager';
 
 const AdminPortal = () => {
   const { settings: globalSettings, updateSettings: updateGlobalSettings } = useStoreSettings();
@@ -2034,13 +2035,33 @@ const AdminPortal = () => {
                 </div>
 
                 <div className="pt-2 border-t border-stone-800 space-y-2">
-                  <h4 className="font-bold text-stone-300 uppercase tracking-wider text-[11px]">Social Sign-In Providers</h4>
+                  <h4 className="font-bold text-stone-300 uppercase tracking-wider text-[11px]">Authentication Strategy & Methods</h4>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="flex items-center gap-2 cursor-pointer text-stone-300">
                       <input
                         type="checkbox"
-                        checked={storeSettings.loginGoogleEnabled !== false}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, loginGoogleEnabled: e.target.checked })}
+                        checked={storeSettings.emailLoginEnabled !== false}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, emailLoginEnabled: e.target.checked })}
+                        className="rounded accent-luxury-accent"
+                      />
+                      <span>Email & Password Login</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-stone-300">
+                      <input
+                        type="checkbox"
+                        checked={storeSettings.registrationEnabled !== false}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, registrationEnabled: e.target.checked })}
+                        className="rounded accent-luxury-accent"
+                      />
+                      <span>Customer Registration Active</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-stone-300">
+                      <input
+                        type="checkbox"
+                        checked={storeSettings.googleLoginEnabled !== false}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, googleLoginEnabled: e.target.checked })}
                         className="rounded accent-luxury-accent"
                       />
                       <span>Google Sign-In Active</span>
@@ -2049,12 +2070,81 @@ const AdminPortal = () => {
                     <label className="flex items-center gap-2 cursor-pointer text-stone-300">
                       <input
                         type="checkbox"
-                        checked={storeSettings.loginFacebookEnabled !== false}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, loginFacebookEnabled: e.target.checked })}
+                        checked={storeSettings.facebookLoginEnabled !== false}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, facebookLoginEnabled: e.target.checked })}
                         className="rounded accent-luxury-accent"
                       />
                       <span>Facebook Sign-In Active</span>
                     </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-stone-300">
+                      <input
+                        type="checkbox"
+                        checked={storeSettings.forgotPasswordEnabled !== false}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, forgotPasswordEnabled: e.target.checked })}
+                        className="rounded accent-luxury-accent"
+                      />
+                      <span>Forgot Password / Brevo Recovery</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-stone-300">
+                      <input
+                        type="checkbox"
+                        checked={storeSettings.otpLoginEnabled !== false}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, otpLoginEnabled: e.target.checked })}
+                        className="rounded accent-luxury-accent"
+                      />
+                      <span>OTP Verification Active</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-stone-800 space-y-3">
+                  <h4 className="font-bold text-stone-300 uppercase tracking-wider text-[11px]">Password Security Policy</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-stone-400 font-bold uppercase mb-1 text-[10px]">Minimum Password Length</label>
+                      <input
+                        type="number"
+                        min="6"
+                        max="32"
+                        value={storeSettings.passwordMinLength || 6}
+                        onChange={(e) => setStoreSettings({ ...storeSettings, passwordMinLength: parseInt(e.target.value, 10) || 6 })}
+                        className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 pt-4 sm:pt-0">
+                      <label className="flex items-center gap-2 cursor-pointer text-stone-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(storeSettings.passwordRequireUppercase)}
+                          onChange={(e) => setStoreSettings({ ...storeSettings, passwordRequireUppercase: e.target.checked })}
+                          className="rounded accent-luxury-accent"
+                        />
+                        <span>Require Uppercase Letter (A-Z)</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer text-stone-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(storeSettings.passwordRequireNumber)}
+                          onChange={(e) => setStoreSettings({ ...storeSettings, passwordRequireNumber: e.target.checked })}
+                          className="rounded accent-luxury-accent"
+                        />
+                        <span>Require Number (0-9)</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer text-stone-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(storeSettings.passwordRequireSpecialChar)}
+                          onChange={(e) => setStoreSettings({ ...storeSettings, passwordRequireSpecialChar: e.target.checked })}
+                          className="rounded accent-luxury-accent"
+                        />
+                        <span>Require Special Character (!@#$)</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
@@ -2063,7 +2153,7 @@ const AdminPortal = () => {
                     type="submit"
                     className="px-6 py-2.5 bg-luxury-accent text-stone-950 font-bold rounded-xl shadow-glow"
                   >
-                    Save Login Page Settings
+                    Save Login & Auth Settings
                   </button>
                 </div>
               </form>
@@ -2071,85 +2161,63 @@ const AdminPortal = () => {
           )}
 
           {/* ======================================================== */}
-          {/* REGISTER PAGE CONTROL TAB */}
+          {/* REGISTER PAGE & CUSTOM FIELDS CONTROL TAB */}
           {/* ======================================================== */}
-          {activeTab === 'register_page' && (
-            <div className="space-y-6 animate-in fade-in max-w-3xl">
-              <div>
-                <h2 className="font-display font-black text-xl text-white">Register Page Management</h2>
-                <p className="text-xs text-stone-400 mt-0.5">
-                  Configure registration page headlines, member perk highlights, and mandatory signup fields.
-                </p>
-              </div>
+          {(activeTab === 'register_page' || activeTab === 'custom_fields') && (
+            <div className="space-y-8 animate-in fade-in">
+              {/* Dynamic Registration Fields Manager Component */}
+              <AdminCustomFieldManager />
 
-              <form onSubmit={handleSaveStoreSettings} className="p-6 rounded-3xl bg-stone-900 border border-stone-800 space-y-4 text-xs">
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Registration Headline</label>
-                  <input
-                    type="text"
-                    value={storeSettings.registerTitle || ''}
-                    onChange={(e) => setStoreSettings({ ...storeSettings, registerTitle: e.target.value })}
-                    placeholder="Create Your Account"
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white font-bold"
-                  />
-                </div>
+              {/* General Page Headline Settings */}
+              <div className="max-w-3xl">
+                <form onSubmit={handleSaveStoreSettings} className="p-6 rounded-3xl bg-stone-900 border border-stone-800 space-y-4 text-xs">
+                  <h3 className="font-display font-bold text-sm text-white border-b border-stone-800 pb-2">
+                    Registration Page Display Copy
+                  </h3>
 
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Registration Subtitle</label>
-                  <input
-                    type="text"
-                    value={storeSettings.registerSubtitle || ''}
-                    onChange={(e) => setStoreSettings({ ...storeSettings, registerSubtitle: e.target.value })}
-                    placeholder="Join for exclusive slipper drops & priority shipping."
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Member Privilege Banner Text</label>
-                  <input
-                    type="text"
-                    value={storeSettings.registerWelcomeMessage || ''}
-                    onChange={(e) => setStoreSettings({ ...storeSettings, registerWelcomeMessage: e.target.value })}
-                    placeholder="Unlock Free Shipping & 15% Welcome Savings"
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
-                  />
-                </div>
-
-                <div className="pt-2 border-t border-stone-800 space-y-2">
-                  <h4 className="font-bold text-stone-300 uppercase tracking-wider text-[11px]">Field Requirements</h4>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-stone-300">
-                      <input
-                        type="checkbox"
-                        checked={storeSettings.registerPhoneRequired !== false}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, registerPhoneRequired: e.target.checked })}
-                        className="rounded accent-luxury-accent"
-                      />
-                      <span>Require Mobile Phone Number</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 cursor-pointer text-stone-300">
-                      <input
-                        type="checkbox"
-                        checked={storeSettings.registerWhatsAppRequired === true}
-                        onChange={(e) => setStoreSettings({ ...storeSettings, registerWhatsAppRequired: e.target.checked })}
-                        className="rounded accent-luxury-accent"
-                      />
-                      <span>Require WhatsApp Number</span>
-                    </label>
+                  <div>
+                    <label className="block text-stone-400 font-bold uppercase mb-1">Registration Headline</label>
+                    <input
+                      type="text"
+                      value={storeSettings.registerTitle || ''}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, registerTitle: e.target.value })}
+                      placeholder="Create Your Account"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white font-bold"
+                    />
                   </div>
-                </div>
 
-                <div className="pt-4 flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-6 py-2.5 bg-luxury-accent text-stone-950 font-bold rounded-xl shadow-glow"
-                  >
-                    Save Register Page Settings
-                  </button>
-                </div>
-              </form>
+                  <div>
+                    <label className="block text-stone-400 font-bold uppercase mb-1">Registration Subtitle</label>
+                    <input
+                      type="text"
+                      value={storeSettings.registerSubtitle || ''}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, registerSubtitle: e.target.value })}
+                      placeholder="Join for exclusive slipper drops & priority shipping."
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-stone-400 font-bold uppercase mb-1">Member Privilege Banner Text</label>
+                    <input
+                      type="text"
+                      value={storeSettings.registerWelcomeMessage || ''}
+                      onChange={(e) => setStoreSettings({ ...storeSettings, registerWelcomeMessage: e.target.value })}
+                      placeholder="Unlock Free Shipping & 15% Welcome Savings"
+                      className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 bg-luxury-accent text-stone-950 font-bold rounded-xl shadow-glow"
+                    >
+                      Save Register Headlines
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
 

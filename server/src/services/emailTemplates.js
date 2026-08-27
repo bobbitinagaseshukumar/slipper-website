@@ -525,6 +525,53 @@ const otpTemplate = ({
   });
 };
 
+/**
+ * 9. Password Reset Link Email Template
+ */
+const passwordResetTemplate = ({
+  customerName = 'Valued Customer',
+  resetUrl,
+  expiresHours = 1,
+  storeSettings = {},
+}) => {
+  const storeName = storeSettings.storeName || 'AuraSole';
+  return baseLayout({
+    title: `Reset Your ${storeName} Password`,
+    preheader: `Secure password reset link for your ${storeName} account.`,
+    storeName,
+    tagline: storeSettings.tagline,
+    logo: storeSettings.logo,
+    supportEmail: storeSettings.supportEmail,
+    whatsappNumber: storeSettings.whatsappNumber,
+    address: storeSettings.address,
+    content: `
+      <div style="text-align: center; padding: 24px 12px;">
+        <span style="background-color: #F8F5EE; color: #121417; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; border: 1px solid #EAE6DD;">
+          Security Verification
+        </span>
+        <h2 style="font-size: 22px; font-weight: 900; color: #121417; margin: 16px 0 8px 0;">
+          Hi ${customerName}, reset your password
+        </h2>
+        <p style="font-size: 13px; color: #666666; margin: 0 0 24px 0; line-height: 1.6; max-width: 440px; margin-left: auto; margin-right: auto;">
+          We received a request to reset the password for your ${storeName} account. Click the button below to choose a new password.
+        </p>
+
+        <!-- CTA Button -->
+        <div style="margin: 28px 0;">
+          <a href="${resetUrl}" class="btn-accent" style="padding: 16px 36px; font-size: 14px;">
+            Reset Account Password
+          </a>
+        </div>
+
+        <p style="font-size: 12px; color: #888888; margin: 20px 0 0 0; line-height: 1.6;">
+          ⏳ This reset link will automatically expire in <strong>${expiresHours} hour</strong>.<br />
+          If you did not request this password reset, you can safely ignore this email — your account remains secure.
+        </p>
+      </div>
+    `,
+  });
+};
+
 module.exports = {
   welcomeTemplate,
   orderPlacedTemplate,
@@ -534,4 +581,5 @@ module.exports = {
   orderCancelledTemplate,
   campaignTemplate,
   otpTemplate,
+  passwordResetTemplate,
 };

@@ -694,20 +694,31 @@ const getAdminCustomers = async (req, res, next) => {
 const updateCustomerStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, blockedReason } = req.body;
 
     const customer = await prisma.user.findUnique({ where: { id } });
     if (!customer) return errorResponse(res, 'Customer not found.', 404);
 
+    const isBlocked = status === 'BLOCKED';
+
     const updated = await prisma.user.update({
       where: { id },
-      data: { status: status === 'BLOCKED' ? 'BLOCKED' : 'ACTIVE' },
-      select: { id: true, name: true, email: true, status: true },
+      data: {
+        status: isBlocked ? 'BLOCKED' : 'ACTIVE',
+        isBlocked,
+        blockedReason: isBlocked ? (blockedReason || 'Temporarily blocked by administrator.') : null,
+      },
+      select: { id: true, name: true, email: true, status: true, isBlocked: true, blockedReason: true },
     });
 
-    await logAdminAction(req.user.id, 'CUSTOMER_STATUS_CHANGED', {
+    if (isBlocked) {
+      await sessionService.revokeAllUserSessions(id, 'ADMIN_BLOCK_USER', true);
+    }
+
+    await logAdminAction(req.user.id, isBlocked ? 'ACCOUNT_BLOCKED' : 'ACCOUNT_UNBLOCKED', {
       customerId: id,
       newStatus: updated.status,
+      blockedReason: updated.blockedReason,
     });
 
     return successResponse(res, `Customer is now ${updated.status}`, updated);
@@ -1917,6 +1928,218 @@ module.exports = {
       });
 
       return successResponse(res, 'Product removed from section. Main catalog item untouched.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ==========================================
+  // CUSTOM REGISTRATION FIELDS MANAGEMENT
+  // ==========================================
+  getAdminCustomFields: async (req, res, next) => {
+    try {
+      const fields = await prisma.customRegistrationField.findMany({
+        orderBy: { displayOrder: 'asc' },
+      });
+      return successResponse(res, 'Custom registration fields retrieved', fields);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  createCustomField: async (req, res, next) => {
+    try {
+      const { fieldName, fieldKey, fieldType, placeholder, options, isRequired, isEnabled, isCustomerEditable } = req.body;
+
+      if (!fieldName || !fieldKey) {
+        return errorResponse(res, 'Field Name and Field Key are required.', 400);
+      }
+
+      const cleanKey = fieldKey.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+      const existing = await prisma.customRegistrationField.findUnique({
+        where: { fieldKey: cleanKey },
+      });
+
+      if (existing) {
+        return errorResponse(res, `Field key "${cleanKey}" already exists.`, 409);
+      }
+
+      const count = await prisma.customRegistrationField.count();
+
+      const newField = await prisma.customRegistrationField.create({
+        data: {
+          fieldName: fieldName.trim(),
+          fieldKey: cleanKey,
+          fieldType: fieldType || 'TEXT',
+          placeholder: placeholder ? placeholder.trim() : null,
+          options: options ? (Array.isArray(options) ? options.join(', ') : options.trim()) : null,
+          isRequired: Boolean(isRequired),
+          isEnabled: isEnabled !== false,
+          isCustomerEditable: isCustomerEditable !== false,
+          displayOrder: count,
+        },
+      });
+
+      await logAdminAction(req.user.id, 'CUSTOM_FIELD_CREATED', { fieldId: newField.id, fieldKey: cleanKey });
+
+      return successResponse(res, 'Custom field created successfully.', newField, 201);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  updateCustomField: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { fieldName, fieldType, placeholder, options, isRequired, isEnabled, isCustomerEditable, displayOrder } = req.body;
+
+      const field = await prisma.customRegistrationField.findUnique({ where: { id } });
+      if (!field) return errorResponse(res, 'Custom field not found.', 404);
+
+      const updated = await prisma.customRegistrationField.update({
+        where: { id },
+        data: {
+          ...(fieldName && { fieldName: fieldName.trim() }),
+          ...(fieldType && { fieldType }),
+          placeholder: placeholder !== undefined ? (placeholder ? placeholder.trim() : null) : field.placeholder,
+          options: options !== undefined ? (Array.isArray(options) ? options.join(', ') : options ? options.trim() : null) : field.options,
+          ...(isRequired !== undefined && { isRequired: Boolean(isRequired) }),
+          ...(isEnabled !== undefined && { isEnabled: Boolean(isEnabled) }),
+          ...(isCustomerEditable !== undefined && { isCustomerEditable: Boolean(isCustomerEditable) }),
+          ...(displayOrder !== undefined && { displayOrder: parseInt(displayOrder, 10) }),
+        },
+      });
+
+      await logAdminAction(req.user.id, 'CUSTOM_FIELD_UPDATED', { fieldId: id, fieldKey: field.fieldKey });
+
+      return successResponse(res, 'Custom field updated successfully.', updated);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  deleteCustomField: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const field = await prisma.customRegistrationField.findUnique({ where: { id } });
+      if (!field) return errorResponse(res, 'Custom field not found.', 404);
+
+      await prisma.customRegistrationField.delete({ where: { id } });
+      await logAdminAction(req.user.id, 'CUSTOM_FIELD_DELETED', { fieldId: id, fieldKey: field.fieldKey });
+
+      return successResponse(res, `Custom field "${field.fieldName}" deleted.`);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  reorderCustomFields: async (req, res, next) => {
+    try {
+      const { orderedIds } = req.body;
+      if (!Array.isArray(orderedIds)) {
+        return errorResponse(res, 'orderedIds array is required.', 400);
+      }
+
+      await prisma.$transaction(
+        orderedIds.map((id, index) =>
+          prisma.customRegistrationField.update({
+            where: { id },
+            data: { displayOrder: index },
+          })
+        )
+      );
+
+      return successResponse(res, 'Custom fields reordered successfully.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  updateCustomerProfileAdmin: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { name, email, phone, whatsappNumber, customFields = {} } = req.body;
+
+      const customer = await prisma.user.findUnique({ where: { id } });
+      if (!customer) return errorResponse(res, 'Customer not found.', 404);
+
+      const existingCustom = typeof customer.customFields === 'object' && customer.customFields !== null ? customer.customFields : {};
+      const mergedCustom = { ...existingCustom, ...customFields };
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: {
+          ...(name && { name: name.trim() }),
+          ...(phone && { phone: phone.trim() }),
+          ...(whatsappNumber && { whatsappNumber: whatsappNumber.trim() }),
+          customFields: mergedCustom,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          whatsappNumber: true,
+          customFields: true,
+          status: true,
+          isBlocked: true,
+        },
+      });
+
+      await logAdminAction(req.user.id, 'ADMIN_CUSTOMER_PROFILE_UPDATED', { customerId: id });
+
+      return successResponse(res, 'Customer profile updated by administrator.', updated);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getAuthAuditLogs: async (req, res, next) => {
+    try {
+      const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
+      const skip = (pageNum - 1) * limitNum;
+
+      const authActions = [
+        'ACCOUNT_CREATED',
+        'CUSTOMER_LOGIN',
+        'CUSTOMER_LOGOUT',
+        'PASSWORD_RESET_REQUESTED',
+        'PASSWORD_RESET_COMPLETED',
+        'GOOGLE_LOGIN',
+        'FACEBOOK_LOGIN',
+        'ACCOUNT_BLOCKED',
+        'ACCOUNT_UNBLOCKED',
+        'ADMIN_FORCE_LOGOUT',
+        'CUSTOMER_FORCE_LOGOUT_ALL_DEVICES',
+      ];
+
+      const where = {
+        action: { in: authActions },
+      };
+
+      const [total, logs] = await Promise.all([
+        prisma.adminActivity.count({ where }),
+        prisma.adminActivity.findMany({
+          where,
+          skip,
+          take: limitNum,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+        }),
+      ]);
+
+      return successResponse(res, 'Authentication audit logs retrieved', {
+        logs,
+        pagination: {
+          total,
+          page: pageNum,
+          totalPages: Math.ceil(total / limitNum) || 1,
+        },
+      });
     } catch (error) {
       next(error);
     }

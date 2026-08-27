@@ -30,6 +30,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ListOrdered,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
@@ -92,7 +93,7 @@ const AdminSidebar = ({
       group: 'Experience & Auth',
       items: [
         { id: 'login_page', label: 'Login Page Control', icon: User },
-        { id: 'register_page', label: 'Register Page Control', icon: Users },
+        { id: 'custom_fields', label: 'Registration Fields', icon: ListOrdered },
         { id: 'checkout_page', label: 'Checkout Control', icon: CreditCard },
         { id: 'popups_mgmt', label: 'Popups & Banner', icon: Sparkles },
         { id: 'pages_mgmt', label: 'About & Policies', icon: FileText },

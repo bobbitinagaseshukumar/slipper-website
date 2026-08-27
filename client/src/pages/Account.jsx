@@ -72,6 +72,7 @@ const Account = () => {
   const { wishlist, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
   const { tab: routeTab, orderNumber } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || routeTab || (orderNumber ? 'orders' : 'dashboard');
   const handleSelectTab = (tabId) => {
     setSearchParams({ tab: tabId });

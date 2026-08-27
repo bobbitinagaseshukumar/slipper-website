@@ -474,6 +474,32 @@ const emailService = {
       category: 'TRANSACTIONAL',
     });
   },
+
+  /**
+   * Send Password Reset Link Email
+   */
+  sendPasswordResetEmail: async ({ email, name, resetToken, expiresHours = 1 }) => {
+    if (!email) return { success: false, reason: 'NO_EMAIL' };
+    const store = await storeSettingsService.getStoreSettings();
+    const storeName = store.storeName || 'AuraSole';
+    const clientUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
+
+    const html = emailTemplates.passwordResetTemplate({
+      customerName: name || 'Valued Customer',
+      resetUrl,
+      expiresHours,
+      storeSettings: store,
+    });
+
+    return await sendRawEmail({
+      recipient: email,
+      subject: `Reset Your ${storeName} Password`,
+      html,
+      emailType: 'PASSWORD_RESET',
+      category: 'TRANSACTIONAL',
+    });
+  },
 };
 
 module.exports = emailService;

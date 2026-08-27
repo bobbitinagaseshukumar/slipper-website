@@ -81,6 +81,9 @@ model User {
   resetToken       String?
   resetTokenExpiry DateTime?
   lastLoginAt      DateTime?
+  customFields     Json?           @default("{}")
+  isBlocked        Boolean         @default(false)
+  blockedReason    String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -592,7 +595,7 @@ model StoreSettings {
   standardShippingFee       Float     @default(99)
   maintenanceMode           Boolean   @default(false)
 
-  // Login Page Controls
+  // Login Page Controls & Authentication Strategy
   loginTitle                String    @default("Welcome Back")
   loginSubtitle             String    @default("Step into your personalized comfort showroom and orders.")
   loginWelcomeMessage       String    @default("Doctor-Engineered Cloud Slippers • Handcrafted Daily Luxury")
@@ -601,8 +604,19 @@ model StoreSettings {
   loginShowPhone            Boolean   @default(true)
   loginShowWhatsApp         Boolean   @default(true)
   loginShowEmail            Boolean   @default(true)
-  loginGoogleEnabled        Boolean   @default(true)
-  loginFacebookEnabled      Boolean   @default(true)
+  emailLoginEnabled         Boolean   @default(true)
+  googleLoginEnabled        Boolean   @default(true)
+  facebookLoginEnabled      Boolean   @default(true)
+  phoneLoginEnabled         Boolean   @default(true)
+  otpLoginEnabled           Boolean   @default(true)
+  registrationEnabled       Boolean   @default(true)
+  forgotPasswordEnabled     Boolean   @default(true)
+
+  // Password Security Policy Rules
+  passwordMinLength         Int       @default(6)
+  passwordRequireUppercase  Boolean   @default(false)
+  passwordRequireNumber     Boolean   @default(false)
+  passwordRequireSpecialChar Boolean  @default(false)
 
   // Register Page Controls
   registerTitle             String    @default("Create Your Account")
@@ -876,4 +890,22 @@ model FlashSale {
 
   @@index([isActive])
   @@index([endTime])
+}
+
+model CustomRegistrationField {
+  id                 String   @id @default(uuid())
+  fieldName          String
+  fieldKey           String   @unique
+  fieldType          String   @default("TEXT") // TEXT, TEL, NUMBER, DATE, SELECT, TEXTAREA
+  placeholder        String?
+  options            String?  // Comma-separated or JSON list of options for SELECT
+  isRequired         Boolean  @default(false)
+  isEnabled          Boolean  @default(true)
+  isCustomerEditable Boolean  @default(true)
+  displayOrder       Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([fieldKey])
+  @@index([isEnabled, displayOrder])
 }

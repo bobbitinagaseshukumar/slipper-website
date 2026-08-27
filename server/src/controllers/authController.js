@@ -4,6 +4,18 @@ const { validateRegisterInput, validateLoginInput } = require('../validators/aut
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 
 /**
+ * Get Public Authentication Settings & Active Registration Fields
+ */
+const getAuthSettings = async (req, res, next) => {
+  try {
+    const settings = await authService.getPublicAuthSettings();
+    return successResponse(res, 'Authentication configuration loaded.', settings);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Register Customer Controller
  */
 const register = async (req, res, next) => {
@@ -13,7 +25,7 @@ const register = async (req, res, next) => {
       return errorResponse(res, 'Validation failed', 422, errors);
     }
 
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, whatsappNumber, password, customFields } = req.body;
     const userAgent = req.headers['user-agent'] || '';
     const ipAddress = req.ip || req.connection?.remoteAddress || '';
 
@@ -21,7 +33,9 @@ const register = async (req, res, next) => {
       name,
       email,
       phone,
+      whatsappNumber,
       password,
+      customFields,
       userAgent,
       ipAddress,
     });
@@ -60,11 +74,80 @@ const login = async (req, res, next) => {
 };
 
 /**
+ * Google Authentication Controller
+ */
+const googleLogin = async (req, res, next) => {
+  try {
+    const { email, name, photoURL, googleId } = req.body;
+    if (!email) {
+      return errorResponse(res, 'Google account email is required.', 400);
+    }
+
+    const userAgent = req.headers['user-agent'] || '';
+    const ipAddress = req.ip || req.connection?.remoteAddress || '';
+
+    const result = await authService.googleAuth({
+      email,
+      name,
+      photoURL,
+      googleId,
+      userAgent,
+      ipAddress,
+    });
+
+    return successResponse(res, 'Authenticated with Google successfully.', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Facebook Authentication Controller
+ */
+const facebookLogin = async (req, res, next) => {
+  try {
+    const { email, name, photoURL, facebookId } = req.body;
+    if (!facebookId && !email) {
+      return errorResponse(res, 'Facebook credentials required.', 400);
+    }
+
+    const userAgent = req.headers['user-agent'] || '';
+    const ipAddress = req.ip || req.connection?.remoteAddress || '';
+
+    const result = await authService.facebookAuth({
+      email,
+      name,
+      photoURL,
+      facebookId,
+      userAgent,
+      ipAddress,
+    });
+
+    return successResponse(res, 'Authenticated with Facebook successfully.', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Get Current Authenticated User Controller
  */
 const getMe = async (req, res, next) => {
   try {
     return successResponse(res, 'Profile retrieved successfully', req.user);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update Profile Controller
+ */
+const updateProfile = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const updated = await authService.updateProfile(userId, req.body);
+    return successResponse(res, 'Profile updated successfully.', updated);
   } catch (error) {
     next(error);
   }
@@ -112,8 +195,8 @@ const resetPassword = async (req, res, next) => {
       return errorResponse(res, 'Password reset token is required.', 400);
     }
 
-    if (!password || password.length < 8) {
-      return errorResponse(res, 'Password must be at least 8 characters long.', 422);
+    if (!password) {
+      return errorResponse(res, 'New password is required.', 422);
     }
 
     if (password !== confirmPassword) {
@@ -127,60 +210,15 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-/**
- * Firebase OAuth Sync Controller
- */
-const firebaseSync = async (req, res, next) => {
-  try {
-    const { firebaseUid, email, name, photoURL, loginProvider } = req.body;
-
-    if (!firebaseUid || !email) {
-      return errorResponse(res, 'Firebase UID and email are required for authentication synchronization.', 400);
-    }
-
-    const userAgent = req.headers['user-agent'] || '';
-    const ipAddress = req.ip || req.connection?.remoteAddress || '';
-
-    const result = await authService.firebaseSync({
-      firebaseUid,
-      email,
-      name,
-      photoURL,
-      loginProvider,
-      userAgent,
-      ipAddress,
-    });
-
-    const message = result.isNewCustomer
-      ? `Welcome to AuraSole Footwear, ${result.user.name.split(' ')[0]}! Let's set up your profile.`
-      : `Welcome back, ${result.user.name.split(' ')[0]}! Ready to find your next favorite pair?`;
-
-    return successResponse(res, message, result);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Complete Onboarding Profile Controller
- */
-const completeOnboarding = async (req, res, next) => {
-  try {
-    const userId = req.user.id;
-    const result = await authService.completeOnboarding(userId, req.body);
-    return successResponse(res, 'Your slipper profile has been completed successfully! Enjoy shopping.', result);
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
+  getAuthSettings,
   register,
   login,
+  googleLogin,
+  facebookLogin,
   getMe,
+  updateProfile,
   logout,
   forgotPassword,
   resetPassword,
-  firebaseSync,
-  completeOnboarding,
 };

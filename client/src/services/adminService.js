@@ -236,6 +236,35 @@ export const adminService = {
   removeProductFromSection: async (sectionId, productId) => {
     return await api.delete(`/admin/sections/${sectionId}/products/${productId}`);
   },
+
+  // Custom Registration Fields Management
+  getCustomRegistrationFields: async () => {
+    return await api.get('/admin/registration-fields');
+  },
+
+  createCustomRegistrationField: async (data) => {
+    return await api.post('/admin/registration-fields', data);
+  },
+
+  updateCustomRegistrationField: async (id, data) => {
+    return await api.put(`/admin/registration-fields/${id}`, data);
+  },
+
+  deleteCustomRegistrationField: async (id) => {
+    return await api.delete(`/admin/registration-fields/${id}`);
+  },
+
+  reorderCustomRegistrationFields: async (orderedIds) => {
+    return await api.post('/admin/registration-fields/reorder', { orderedIds });
+  },
+
+  updateCustomerProfileAdmin: async (id, data) => {
+    return await api.put(`/admin/customers/${id}/profile`, data);
+  },
+
+  getAuthAuditLogs: async (params) => {
+    return await api.get('/admin/auth-logs', { params });
+  },
 };
 
 export default adminService;

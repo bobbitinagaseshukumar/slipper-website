@@ -134,14 +134,27 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
+  const updateProfile = async (profileData) => {
+    const response = await authService.updateProfile(profileData);
+    if (response?.data) {
+      setUser(response.data);
+      setAuthNotification({
+        type: 'success',
+        message: 'Profile updated successfully!',
+      });
+    }
+    return response;
+  };
+
   const logout = async () => {
     try {
       await authService.logout();
-      await logoutFirebase();
+      await logoutFirebase().catch(() => {});
     } catch (e) {
       // Ignore network errors on logout
     } finally {
       localStorage.removeItem('aurasole_token');
+      localStorage.removeItem('adminToken');
       setToken(null);
       setUser(null);
       setAuthNotification(null);
@@ -175,6 +188,7 @@ export const AuthProvider = ({ children }) => {
     loginGoogle,
     loginFacebook,
     submitOnboarding,
+    updateProfile,
     logout,
     updateUser,
   };
