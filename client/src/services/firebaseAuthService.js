@@ -54,7 +54,7 @@ export const formatFirebaseAuthError = (error) => {
  */
 export const signInWithGoogle = async () => {
   if (!isFirebaseConfigured) {
-    throw new Error('Firebase credentials are not configured yet in .env.');
+    throw new Error('Google Sign-In requires Firebase API keys in client/.env. You can sign in using Email & Password below!');
   }
   try {
     const result = await signInWithPopup(auth, googleProvider);
@@ -69,7 +69,7 @@ export const signInWithGoogle = async () => {
  */
 export const signInWithFacebook = async () => {
   if (!isFirebaseConfigured) {
-    throw new Error('Firebase credentials are not configured yet in .env.');
+    throw new Error('Facebook Sign-In requires Firebase API keys in client/.env. You can sign in using Email & Password below!');
   }
   try {
     const result = await signInWithPopup(auth, facebookProvider);
@@ -84,7 +84,7 @@ export const signInWithFacebook = async () => {
  */
 export const registerWithEmail = async (email, password, displayName = '') => {
   if (!isFirebaseConfigured) {
-    throw new Error('Firebase credentials are not configured yet in .env.');
+    throw new Error('Firebase credentials are not configured in client/.env.');
   }
   try {
     const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -102,7 +102,7 @@ export const registerWithEmail = async (email, password, displayName = '') => {
  */
 export const loginWithEmail = async (email, password) => {
   if (!isFirebaseConfigured) {
-    throw new Error('Firebase credentials are not configured yet in .env.');
+    throw new Error('Firebase credentials are not configured in client/.env.');
   }
   try {
     const result = await signInWithEmailAndPassword(auth, email, password);
@@ -117,7 +117,7 @@ export const loginWithEmail = async (email, password) => {
  */
 export const sendPasswordReset = async (email) => {
   if (!isFirebaseConfigured) {
-    throw new Error('Firebase credentials are not configured yet in .env.');
+    throw new Error('Firebase credentials are not configured in client/.env.');
   }
   try {
     await sendPasswordResetEmail(auth, email);
