@@ -1367,11 +1367,30 @@ const getAdminBanners = async (req, res, next) => {
 
 const createBanner = async (req, res, next) => {
   try {
-    const { title, subtitle, tagline, image, link, ctaText = 'Shop Now', isActive = true } = req.body;
+    const {
+      title,
+      subtitle,
+      tagline,
+      image,
+      mobileImage,
+      link,
+      ctaText = 'Shop Now',
+      badge,
+      startDate,
+      endDate,
+      status = 'PUBLISHED',
+      targetType,
+      targetId,
+      isActive = true,
+    } = req.body;
 
     if (!title || !image) {
       return errorResponse(res, 'Title and banner image are required.', 422);
     }
+
+    // Get max display order
+    const maxOrder = await prisma.banner.aggregate({ _max: { displayOrder: true } });
+    const nextOrder = (maxOrder._max.displayOrder || 0) + 1;
 
     const banner = await prisma.banner.create({
       data: {
@@ -1379,14 +1398,115 @@ const createBanner = async (req, res, next) => {
         subtitle,
         tagline,
         image,
+        mobileImage,
         link: link || '/shop',
         ctaText,
+        badge,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        status,
+        targetType,
+        targetId,
+        displayOrder: nextOrder,
         isActive: Boolean(isActive),
       },
     });
 
     await logAdminAction(req.user.id, 'BANNER_CREATED', { bannerId: banner.id, title });
-    return successResponse(res, 'Banner created', banner, 201);
+    return successResponse(res, 'Banner created successfully', banner, 201);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateBanner = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      subtitle,
+      tagline,
+      image,
+      mobileImage,
+      link,
+      ctaText,
+      badge,
+      startDate,
+      endDate,
+      status,
+      targetType,
+      targetId,
+      isActive,
+      displayOrder,
+    } = req.body;
+
+    const existing = await prisma.banner.findUnique({ where: { id } });
+    if (!existing) {
+      return errorResponse(res, 'Banner not found.', 404);
+    }
+
+    const updated = await prisma.banner.update({
+      where: { id },
+      data: {
+        ...(title !== undefined && { title: title.trim() }),
+        ...(subtitle !== undefined && { subtitle }),
+        ...(tagline !== undefined && { tagline }),
+        ...(image !== undefined && { image }),
+        ...(mobileImage !== undefined && { mobileImage }),
+        ...(link !== undefined && { link }),
+        ...(ctaText !== undefined && { ctaText }),
+        ...(badge !== undefined && { badge }),
+        ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+        ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
+        ...(status !== undefined && { status }),
+        ...(targetType !== undefined && { targetType }),
+        ...(targetId !== undefined && { targetId }),
+        ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+        ...(displayOrder !== undefined && { displayOrder: parseInt(displayOrder, 10) }),
+      },
+    });
+
+    await logAdminAction(req.user.id, 'BANNER_UPDATED', { bannerId: id, title: updated.title });
+    return successResponse(res, 'Banner updated successfully', updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteBanner = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.banner.findUnique({ where: { id } });
+    if (!existing) {
+      return errorResponse(res, 'Banner not found.', 404);
+    }
+
+    await prisma.banner.delete({ where: { id } });
+    await logAdminAction(req.user.id, 'BANNER_DELETED', { bannerId: id, title: existing.title });
+    return successResponse(res, 'Banner deleted successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const reorderBanners = async (req, res, next) => {
+  try {
+    const { bannerOrders } = req.body;
+    if (!Array.isArray(bannerOrders)) {
+      return errorResponse(res, 'bannerOrders array is required.', 400);
+    }
+
+    await Promise.all(
+      bannerOrders.map((item, index) =>
+        prisma.banner.update({
+          where: { id: item.id },
+          data: { displayOrder: item.displayOrder ?? index + 1 },
+        })
+      )
+    );
+
+    await logAdminAction(req.user.id, 'BANNERS_REORDERED', { count: bannerOrders.length });
+    return successResponse(res, 'Banners layout reordered successfully');
   } catch (error) {
     next(error);
   }
@@ -1773,6 +1893,9 @@ module.exports = {
   createCoupon,
   getAdminBanners,
   createBanner,
+  updateBanner,
+  deleteBanner,
+  reorderBanners,
   getSubCategories,
   createSubCategory,
   deleteSubCategory,

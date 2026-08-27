@@ -3,15 +3,28 @@ import api from '../services/api';
 
 const DEFAULT_SETTINGS = {
   storeName: 'AuraSole',
+  brandName: 'AuraSole',
+  storeTitle: 'AuraSole — Luxury Slipper Showroom',
   tagline: 'Walk With Pure Luxury',
   description: 'Handcrafted orthotic and luxury comfort slippers engineered for effortless daily elegance.',
   logo: null,
+  logoDark: null,
   favicon: null,
+  footerLogo: null,
   contactEmail: 'support@aurasole.com',
   supportEmail: 'support@aurasole.com',
   phone: '+91 98765 43210',
   whatsappNumber: '+91 98765 43210',
+  whatsappCommunityLink: '',
+  whatsappDefaultMessage: 'Hi AuraSole! I would like to order slippers.',
+  whatsappGreeting: 'Welcome to AuraSole Luxury Footwear Support.',
+  whatsappSupportMessage: 'Need help finding your perfect slipper size? Chat with us.',
   address: 'Showroom 42, Slipper Heritage Lane, Luxury Avenue, Mumbai - 400001',
+  city: 'Mumbai',
+  district: 'Mumbai City',
+  state: 'Maharashtra',
+  pincode: '400001',
+  country: 'India',
   businessHours: 'Mon - Sat: 9:00 AM - 9:00 PM | Sun: 10:00 AM - 7:00 PM',
   currency: 'INR',
   currencySymbol: '₹',
@@ -30,6 +43,8 @@ const DEFAULT_SETTINGS = {
   freeShippingThreshold: 999,
   standardShippingFee: 99,
   maintenanceMode: false,
+  maintenanceMessage: 'Our Luxury Slipper Showroom is currently undergoing scheduled upgrades. We will be back online shortly.',
+  maintenanceEstimatedEndTime: null,
 
   // Login Page Controls
   loginTitle: 'Welcome Back',
@@ -75,7 +90,15 @@ const DEFAULT_SETTINGS = {
   aboutStory: 'AuraSole was founded with a singular mission: to eliminate daily foot fatigue by engineering the perfect balance of orthotic arch support and cloud-like cushioning.',
   aboutMission: "To handcraft India's most comfortable, doctor-approved daily recovery slippers.",
   aboutVision: 'To elevate everyday indoor and outdoor footwear into a premium wellness experience.',
+  aboutImages: [],
+  aboutHighlights: [],
   contactMapEmbed: '',
+  mapCoordinates: '18.9220,72.8347',
+  mapDisplayActive: true,
+
+  // Navigation & Footer Config
+  navigationConfig: [],
+  footerLinks: [],
 
   // Dynamic Policies
   privacyPolicyHtml: '',

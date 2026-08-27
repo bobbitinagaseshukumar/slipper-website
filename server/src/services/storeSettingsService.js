@@ -7,15 +7,28 @@ const CACHE_TTL_MS = 60 * 1000; // 1 minute cache, invalidated immediately upon 
 
 const DEFAULT_SETTINGS = {
   storeName: 'AuraSole',
+  brandName: 'AuraSole',
+  storeTitle: 'AuraSole — Luxury Slipper Showroom',
   tagline: 'Walk With Pure Luxury',
   description: 'Handcrafted orthotic and luxury comfort slippers engineered for effortless daily elegance.',
   logo: '',
+  logoDark: '',
   favicon: '',
+  footerLogo: '',
   contactEmail: 'support@aurasole.com',
   supportEmail: 'support@aurasole.com',
   phone: '+91 98765 43210',
   whatsappNumber: '+91 98765 43210',
+  whatsappCommunityLink: '',
+  whatsappDefaultMessage: 'Hi AuraSole! I would like to order slippers.',
+  whatsappGreeting: 'Welcome to AuraSole Luxury Footwear Support.',
+  whatsappSupportMessage: 'Need help finding your perfect slipper size? Chat with us.',
   address: 'Showroom 42, Slipper Heritage Lane, Luxury Avenue, Mumbai - 400001',
+  city: 'Mumbai',
+  district: 'Mumbai City',
+  state: 'Maharashtra',
+  pincode: '400001',
+  country: 'India',
   businessHours: 'Mon - Sat: 9:00 AM - 9:00 PM | Sun: 10:00 AM - 7:00 PM',
   currency: 'INR',
   currencySymbol: '₹',
@@ -35,6 +48,8 @@ const DEFAULT_SETTINGS = {
   freeShippingThreshold: 999,
   standardShippingFee: 99,
   maintenanceMode: false,
+  maintenanceMessage: 'Our Luxury Slipper Showroom is currently undergoing scheduled upgrades. We will be back online shortly.',
+  maintenanceEstimatedEndTime: null,
 
   // Login Page Controls
   loginTitle: 'Welcome Back',
@@ -80,7 +95,15 @@ const DEFAULT_SETTINGS = {
   aboutStory: 'AuraSole was founded with a singular mission: to eliminate daily foot fatigue by engineering the perfect balance of orthotic arch support and cloud-like cushioning.',
   aboutMission: "To handcraft India's most comfortable, doctor-approved daily recovery slippers.",
   aboutVision: 'To elevate everyday indoor and outdoor footwear into a premium wellness experience.',
+  aboutImages: [],
+  aboutHighlights: [],
   contactMapEmbed: '',
+  mapCoordinates: '18.9220,72.8347',
+  mapDisplayActive: true,
+
+  // Navigation & Footer Config
+  navigationConfig: [],
+  footerLinks: [],
 
   // Dynamic Policies
   privacyPolicyHtml: '',
@@ -124,15 +147,28 @@ const getPublicSettings = async () => {
   const full = await getStoreSettings();
   return {
     storeName: full.storeName || DEFAULT_SETTINGS.storeName,
+    brandName: full.brandName || full.storeName || DEFAULT_SETTINGS.brandName,
+    storeTitle: full.storeTitle || DEFAULT_SETTINGS.storeTitle,
     tagline: full.tagline || DEFAULT_SETTINGS.tagline,
     description: full.description || DEFAULT_SETTINGS.description,
     logo: full.logo || null,
+    logoDark: full.logoDark || null,
     favicon: full.favicon || null,
+    footerLogo: full.footerLogo || null,
     contactEmail: full.contactEmail || DEFAULT_SETTINGS.contactEmail,
     supportEmail: full.supportEmail || DEFAULT_SETTINGS.supportEmail,
     phone: full.phone || DEFAULT_SETTINGS.phone,
     whatsappNumber: full.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
+    whatsappCommunityLink: full.whatsappCommunityLink,
+    whatsappDefaultMessage: full.whatsappDefaultMessage || DEFAULT_SETTINGS.whatsappDefaultMessage,
+    whatsappGreeting: full.whatsappGreeting || DEFAULT_SETTINGS.whatsappGreeting,
+    whatsappSupportMessage: full.whatsappSupportMessage || DEFAULT_SETTINGS.whatsappSupportMessage,
     address: full.address || DEFAULT_SETTINGS.address,
+    city: full.city || DEFAULT_SETTINGS.city,
+    district: full.district || DEFAULT_SETTINGS.district,
+    state: full.state || DEFAULT_SETTINGS.state,
+    pincode: full.pincode || DEFAULT_SETTINGS.pincode,
+    country: full.country || DEFAULT_SETTINGS.country,
     businessHours: full.businessHours || DEFAULT_SETTINGS.businessHours,
     currency: full.currency || DEFAULT_SETTINGS.currency,
     currencySymbol: full.currencySymbol || DEFAULT_SETTINGS.currencySymbol,
@@ -151,6 +187,8 @@ const getPublicSettings = async () => {
     freeShippingThreshold: full.freeShippingThreshold,
     standardShippingFee: full.standardShippingFee,
     maintenanceMode: full.maintenanceMode,
+    maintenanceMessage: full.maintenanceMessage,
+    maintenanceEstimatedEndTime: full.maintenanceEstimatedEndTime,
 
     // Login Page Controls
     loginTitle: full.loginTitle || DEFAULT_SETTINGS.loginTitle,
@@ -196,7 +234,15 @@ const getPublicSettings = async () => {
     aboutStory: full.aboutStory || DEFAULT_SETTINGS.aboutStory,
     aboutMission: full.aboutMission || DEFAULT_SETTINGS.aboutMission,
     aboutVision: full.aboutVision || DEFAULT_SETTINGS.aboutVision,
+    aboutImages: full.aboutImages || [],
+    aboutHighlights: full.aboutHighlights || [],
     contactMapEmbed: full.contactMapEmbed,
+    mapCoordinates: full.mapCoordinates || DEFAULT_SETTINGS.mapCoordinates,
+    mapDisplayActive: full.mapDisplayActive !== false,
+
+    // Navigation & Footer Config
+    navigationConfig: full.navigationConfig || [],
+    footerLinks: full.footerLinks || [],
 
     // Dynamic Policies
     privacyPolicyHtml: full.privacyPolicyHtml,

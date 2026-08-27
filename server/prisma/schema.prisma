@@ -540,21 +540,27 @@ model Coupon {
 }
 
 model Banner {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   title        String
   subtitle     String?
   tagline      String?
   image        String
   mobileImage  String?
   link         String?
-  ctaText      String?  @default("Shop Now")
+  ctaText      String?   @default("Shop Now")
   badge        String?
-  displayOrder Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  displayOrder Int       @default(0)
+  startDate    DateTime?
+  endDate      DateTime?
+  status       String    @default("PUBLISHED") // DRAFT, PUBLISHED, ARCHIVED
+  targetType   String?   // CATEGORY, BRAND, PRODUCT, FESTIVAL, CUSTOM
+  targetId     String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([isActive])
+  @@index([status])
   @@index([displayOrder])
 }
 
@@ -610,15 +616,28 @@ model SiteSetting {
 model StoreSettings {
   id                        String    @id @default(uuid())
   storeName                 String    @default("AuraSole")
+  brandName                 String    @default("AuraSole")
+  storeTitle                String    @default("AuraSole — Luxury Slipper Showroom")
   tagline                   String    @default("Walk With Pure Luxury")
   description               String    @default("Handcrafted orthotic and luxury comfort slippers engineered for effortless daily elegance.")
   logo                      String?
+  logoDark                  String?
   favicon                   String?
+  footerLogo                String?
   contactEmail              String    @default("support@aurasole.com")
   supportEmail              String    @default("support@aurasole.com")
   phone                     String    @default("+91 98765 43210")
   whatsappNumber            String    @default("+91 98765 43210")
+  whatsappCommunityLink     String?
+  whatsappDefaultMessage    String?   @default("Hi AuraSole! I would like to order slippers.")
+  whatsappGreeting          String?   @default("Welcome to AuraSole Luxury Footwear Support.")
+  whatsappSupportMessage    String?   @default("Need help finding your perfect slipper size? Chat with us.")
   address                   String    @default("Showroom 42, Slipper Heritage Lane, Luxury Avenue, Mumbai - 400001")
+  city                      String    @default("Mumbai")
+  district                  String    @default("Mumbai City")
+  state                     String    @default("Maharashtra")
+  pincode                   String    @default("400001")
+  country                   String    @default("India")
   businessHours             String    @default("Mon - Sat: 9:00 AM - 9:00 PM | Sun: 10:00 AM - 7:00 PM")
   currency                  String    @default("INR")
   currencySymbol            String    @default("₹")
@@ -638,6 +657,8 @@ model StoreSettings {
   freeShippingThreshold     Float     @default(999)
   standardShippingFee       Float     @default(99)
   maintenanceMode           Boolean   @default(false)
+  maintenanceMessage        String?   @default("Our Luxury Slipper Showroom is currently undergoing scheduled upgrades. We will be back online shortly.")
+  maintenanceEstimatedEndTime DateTime?
 
   // Login Page Controls & Authentication Strategy
   loginTitle                String    @default("Welcome Back")
@@ -694,7 +715,15 @@ model StoreSettings {
   aboutStory                String    @default("AuraSole was founded with a singular mission: to eliminate daily foot fatigue by engineering the perfect balance of orthotic arch support and cloud-like cushioning.")
   aboutMission              String    @default("To handcraft India's most comfortable, doctor-approved daily recovery slippers.")
   aboutVision               String    @default("To elevate everyday indoor and outdoor footwear into a premium wellness experience.")
+  aboutImages               Json?     @default("[]")
+  aboutHighlights           Json?     @default("[]")
   contactMapEmbed           String?
+  mapCoordinates            String?   @default("18.9220,72.8347")
+  mapDisplayActive          Boolean   @default(true)
+
+  // Navigation & Footer Config
+  navigationConfig          Json?     @default("[]")
+  footerLinks               Json?     @default("[]")
 
   // Dynamic Policies
   privacyPolicyHtml         String?

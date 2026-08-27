@@ -71,6 +71,9 @@ router.post('/coupons', adminController.createCoupon);
 // 8. Banners
 router.get('/banners', adminController.getAdminBanners);
 router.post('/banners', adminController.createBanner);
+router.put('/banners/:id', adminController.updateBanner);
+router.delete('/banners/:id', adminController.deleteBanner);
+router.post('/banners/reorder', adminController.reorderBanners);
 
 // 9. Offers & Deals
 router.get('/offers', adminController.getOffers);

@@ -232,6 +232,18 @@ export const adminService = {
     return await api.post('/admin/banners', bannerData);
   },
 
+  updateBanner: async (id, bannerData) => {
+    return await api.put(`/admin/banners/${id}`, bannerData);
+  },
+
+  deleteBanner: async (id) => {
+    return await api.delete(`/admin/banners/${id}`);
+  },
+
+  reorderBanners: async (bannerOrders) => {
+    return await api.post('/admin/banners/reorder', { bannerOrders });
+  },
+
   // Audit Logs
   getAuditLogs: async () => {
     return await api.get('/admin/audit-logs');

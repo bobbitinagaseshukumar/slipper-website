@@ -6,6 +6,8 @@ const { successResponse } = require('../utils/responseHandler');
  */
 const getHomepageData = async (req, res, next) => {
   try {
+    const now = new Date();
+
     const [
       banners,
       categories,
@@ -19,10 +21,23 @@ const getHomepageData = async (req, res, next) => {
       reviews,
       settingsRaw,
       sections,
+      festivalDeals,
+      flashSales,
+      offers,
+      storeSettingsRecord,
     ] = await Promise.all([
-      // 1. Hero Banners
+      // 1. Hero Banners (Active, Published, Within Scheduled Window)
       prisma.banner.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          status: 'PUBLISHED',
+          OR: [
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: { gte: now } },
+          ],
+        },
         orderBy: { displayOrder: 'asc' },
       }),
 
@@ -57,45 +72,45 @@ const getHomepageData = async (req, res, next) => {
         },
       }),
 
-      // 3. New Arrivals (Latest 8)
+      // 4. New Arrivals (Latest 8)
       prisma.product.findMany({
-        where: { isActive: true, isNewArrival: true },
+        where: { isActive: true, status: 'PUBLISHED', isNewArrival: true },
         take: 8,
         orderBy: { createdAt: 'desc' },
         include: {
           category: { select: { name: true, slug: true } },
           images: { select: { url: true, isPrimary: true }, orderBy: { sortOrder: 'asc' } },
-          variants: { select: { size: true, colorName: true, colorCode: true } },
+          variants: { select: { size: true, colorName: true, colorCode: true, stock: true } },
         },
       }),
 
-      // 4. Trending Slippers (8)
+      // 5. Trending Slippers (8)
       prisma.product.findMany({
-        where: { isActive: true, isTrending: true },
+        where: { isActive: true, status: 'PUBLISHED', isTrending: true },
         take: 8,
         orderBy: { rating: 'desc' },
         include: {
           category: { select: { name: true, slug: true } },
           images: { select: { url: true, isPrimary: true }, orderBy: { sortOrder: 'asc' } },
-          variants: { select: { size: true, colorName: true, colorCode: true } },
+          variants: { select: { size: true, colorName: true, colorCode: true, stock: true } },
         },
       }),
 
-      // 5. Best Sellers (8)
+      // 6. Best Sellers (8)
       prisma.product.findMany({
-        where: { isActive: true, isBestSeller: true },
+        where: { isActive: true, status: 'PUBLISHED', isBestSeller: true },
         take: 8,
         orderBy: { reviewCount: 'desc' },
         include: {
           category: { select: { name: true, slug: true } },
           images: { select: { url: true, isPrimary: true }, orderBy: { sortOrder: 'asc' } },
-          variants: { select: { size: true, colorName: true, colorCode: true } },
+          variants: { select: { size: true, colorName: true, colorCode: true, stock: true } },
         },
       }),
 
-      // 6. Men's Featured Collection (4)
+      // 7. Men's Featured Collection (4)
       prisma.product.findMany({
-        where: { isActive: true, gender: 'MEN' },
+        where: { isActive: true, status: 'PUBLISHED', gender: 'MEN' },
         take: 4,
         orderBy: { isFeatured: 'desc' },
         include: {
@@ -104,9 +119,9 @@ const getHomepageData = async (req, res, next) => {
         },
       }),
 
-      // 7. Women's Featured Collection (4)
+      // 8. Women's Featured Collection (4)
       prisma.product.findMany({
-        where: { isActive: true, gender: 'WOMEN' },
+        where: { isActive: true, status: 'PUBLISHED', gender: 'WOMEN' },
         take: 4,
         orderBy: { isFeatured: 'desc' },
         include: {
@@ -115,9 +130,9 @@ const getHomepageData = async (req, res, next) => {
         },
       }),
 
-      // 8. Kids' Featured Collection (4)
+      // 9. Kids' Featured Collection (4)
       prisma.product.findMany({
-        where: { isActive: true, gender: 'KIDS' },
+        where: { isActive: true, status: 'PUBLISHED', gender: 'KIDS' },
         take: 4,
         orderBy: { isFeatured: 'desc' },
         include: {
@@ -126,7 +141,7 @@ const getHomepageData = async (req, res, next) => {
         },
       }),
 
-      // 9. Verified Customer Testimonials (4)
+      // 10. Verified Customer Testimonials (4)
       prisma.review.findMany({
         where: { isApproved: true, rating: { gte: 4 } },
         take: 4,
@@ -137,14 +152,22 @@ const getHomepageData = async (req, res, next) => {
         },
       }),
 
-      // 10. Public Site Settings
+      // 11. Public Site Settings
       prisma.siteSetting.findMany({
         where: { isPublic: true },
       }),
 
-      // 11. Dynamic Homepage Sections & Festival Campaigns
+      // 12. Dynamic Homepage Sections & Festival Campaigns
       prisma.homepageSection.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          OR: [
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: { gte: now } },
+          ],
+        },
         orderBy: { displayOrder: 'asc' },
         include: {
           products: {
@@ -161,6 +184,43 @@ const getHomepageData = async (req, res, next) => {
           },
         },
       }),
+
+      // 13. Festival Deals
+      prisma.festivalDeal.findMany({
+        where: {
+          isActive: true,
+          startDate: { lte: now },
+          endDate: { gte: now },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+
+      // 14. Flash Sales
+      prisma.flashSale.findMany({
+        where: {
+          isActive: true,
+          startTime: { lte: now },
+          endTime: { gte: now },
+        },
+        orderBy: { endTime: 'asc' },
+      }),
+
+      // 15. Special Offers
+      prisma.offer.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: { gte: now } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+
+      // 16. Store Settings Record
+      prisma.storeSettings.findFirst(),
     ]);
 
     // Format settings into a key-value object
@@ -182,8 +242,19 @@ const getHomepageData = async (req, res, next) => {
         kids: kidsCollection,
       },
       sections,
+      festivalDeals,
+      flashSales,
+      offers,
       reviews,
-      settings,
+      settings: {
+        ...settings,
+        storeName: storeSettingsRecord?.storeName || 'AuraSole',
+        tagline: storeSettingsRecord?.tagline || 'Walk With Pure Luxury',
+        announcementText: storeSettingsRecord?.announcementActive ? storeSettingsRecord.announcementMessage : '',
+        whatsappNumber: storeSettingsRecord?.whatsappNumber || '+91 98765 43210',
+        logo: storeSettingsRecord?.logo || null,
+        maintenanceMode: storeSettingsRecord?.maintenanceMode || false,
+      },
     });
   } catch (error) {
     next(error);
