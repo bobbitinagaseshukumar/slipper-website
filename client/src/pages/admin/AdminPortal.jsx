@@ -55,6 +55,7 @@ import AdminHeader from '../../components/admin/AdminHeader';
 import AdminEmailCenter from '../../components/admin/AdminEmailCenter';
 import AdminCategoryManager from '../../components/admin/AdminCategoryManager';
 import AdminProductModal from '../../components/admin/AdminProductModal';
+import AdminSectionManager from '../../components/admin/AdminSectionManager';
 
 const AdminPortal = () => {
   const { settings: globalSettings, updateSettings: updateGlobalSettings } = useStoreSettings();
@@ -1255,35 +1256,11 @@ const AdminPortal = () => {
           )}
 
           {/* ======================================================== */}
-          {/* 7. FESTIVAL DEALS TAB */}
+          {/* 7. HOMEPAGE SECTIONS & FESTIVAL CAMPAIGNS TAB */}
           {/* ======================================================== */}
-          {activeTab === 'festival_deals' && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-display font-black text-xl text-white">Festival Deals & Celebrations</h2>
-                  <p className="text-xs text-stone-400 mt-0.5">Diwali, Eid, Pongal & New Year Festive Footwear campaigns.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAddFestivalDealOpen(true)}
-                  className="px-4 py-2.5 bg-luxury-accent text-stone-950 font-bold text-xs rounded-2xl shadow-glow flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" /> Launch Festive Deal
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {festivalDeals.map((fd) => (
-                  <div key={fd.id} className="p-5 rounded-3xl bg-stone-900 border border-stone-800 space-y-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-luxury-accent text-stone-950 font-bold text-[10px]">
-                      {fd.festivalName}
-                    </span>
-                    <h4 className="font-display font-bold text-lg text-white">{fd.title}</h4>
-                    <p className="text-xs font-mono text-emerald-400 font-bold">Code: {fd.couponCode || 'FESTIVAL50'}</p>
-                  </div>
-                ))}
-              </div>
+          {(activeTab === 'homepage' || activeTab === 'festival_deals') && (
+            <div className="animate-in fade-in">
+              <AdminSectionManager showToast={showToast} />
             </div>
           )}
 

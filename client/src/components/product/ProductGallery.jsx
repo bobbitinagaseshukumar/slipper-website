@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Sparkles, ChevronLeft, ChevronRight, Rotate3d } from 'lucide-react';
 import FullscreenImageViewer from './FullscreenImageViewer';
 
-const ProductGallery = ({ images = [], productName = 'Slipper' }) => {
+const ProductGallery = ({ images = [], productName = 'Slipper', selectedColor = null }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
@@ -11,6 +11,23 @@ const ProductGallery = ({ images = [], productName = 'Slipper' }) => {
   const [tilt, setTilt] = useState({ x: 0, y: 0, glowX: 50, glowY: 50 });
   const [isHovered, setIsHovered] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+
+  // Filter photos by selected color if color-specific photos exist
+  const colorFilteredImages = selectedColor
+    ? images.filter((img) => img.colorName && img.colorName.toLowerCase() === selectedColor.toLowerCase())
+    : [];
+
+  const activeImageList =
+    colorFilteredImages.length > 0
+      ? colorFilteredImages
+      : images.length > 0
+      ? images
+      : [{ url: 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=800', altText: productName }];
+
+  // Reset selected image index when color changes
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [selectedColor]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -20,10 +37,7 @@ const ProductGallery = ({ images = [], productName = 'Slipper' }) => {
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
-  const imageList = images.length > 0
-    ? images
-    : [{ url: 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=800', altText: productName }];
-
+  const imageList = activeImageList;
   const currentImage = imageList[selectedIndex] || imageList[0];
 
   // Mouse move handler for 3D tilt & magnifying zoom on desktop

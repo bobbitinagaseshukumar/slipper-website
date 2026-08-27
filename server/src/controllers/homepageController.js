@@ -17,6 +17,7 @@ const getHomepageData = async (req, res, next) => {
       kidsCollection,
       reviews,
       settingsRaw,
+      sections,
     ] = await Promise.all([
       // 1. Hero Banners
       prisma.banner.findMany({
@@ -122,6 +123,26 @@ const getHomepageData = async (req, res, next) => {
       prisma.siteSetting.findMany({
         where: { isPublic: true },
       }),
+
+      // 11. Dynamic Homepage Sections & Festival Campaigns
+      prisma.homepageSection.findMany({
+        where: { isActive: true },
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          products: {
+            orderBy: { sortOrder: 'asc' },
+            include: {
+              product: {
+                include: {
+                  category: { select: { name: true, slug: true } },
+                  images: { select: { url: true, colorName: true, isPrimary: true }, orderBy: { sortOrder: 'asc' } },
+                  variants: { select: { size: true, colorName: true, colorCode: true, stock: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     // Format settings into a key-value object
@@ -141,6 +162,7 @@ const getHomepageData = async (req, res, next) => {
         women: womensCollection,
         kids: kidsCollection,
       },
+      sections,
       reviews,
       settings,
     });

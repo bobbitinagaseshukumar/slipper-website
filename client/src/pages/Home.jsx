@@ -23,6 +23,7 @@ import NewsletterSection from '../components/common/NewsletterSection';
 
 import ProductCard from '../components/product/ProductCard';
 import ProductCardSkeleton from '../components/product/ProductCardSkeleton';
+import DynamicSection from '../components/home/DynamicSection';
 
 const Home = () => {
   const [data, setData] = useState(null);
@@ -55,6 +56,7 @@ const Home = () => {
   const newArrivals = data?.newArrivals || [];
   const trending = data?.trending || [];
   const collections = data?.collections || {};
+  const dynamicSections = data?.sections || [];
   const reviews = data?.reviews || [];
 
   return (
@@ -77,6 +79,15 @@ const Home = () => {
 
         {/* Categories Showcase with 3D Tilt Cards */}
         <CategoryGrid categories={categories} />
+
+        {/* Dynamic Admin-Configured Festival & Custom Sections */}
+        {dynamicSections && dynamicSections.length > 0 && (
+          <div className="space-y-6">
+            {dynamicSections.map((sec) => (
+              <DynamicSection key={sec.id} section={sec} />
+            ))}
+          </div>
+        )}
 
         {/* 1. New Arrivals Section */}
         <section className="py-16 bg-luxury-warmWhite">

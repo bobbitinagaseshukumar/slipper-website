@@ -352,6 +352,7 @@ const ProductDetails = () => {
             <ProductGallery
               images={product.images || []}
               productName={product.name}
+              selectedColor={selectedColor}
             />
           </div>
 
@@ -361,7 +362,7 @@ const ProductDetails = () => {
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
                 <span className="text-xs font-bold uppercase tracking-widest text-luxury-accent">
-                  {product.brand || 'AuraSole Signature'}
+                  {product.brand || 'AuraSole'} {product.brandingType ? `• ${product.brandingType}` : ''}
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -420,7 +421,7 @@ const ProductDetails = () => {
             </div>
 
             {/* Price & Discounts Block */}
-            <div className="p-4 rounded-3xl bg-white border border-gray-100/90 shadow-2xs space-y-1">
+            <div className="p-4 rounded-3xl bg-white border border-gray-100/90 shadow-2xs space-y-2">
               <div className="flex items-baseline gap-3">
                 <span className="font-display font-black text-3xl text-luxury-dark">
                   ₹{displayPrice}
@@ -436,9 +437,19 @@ const ProductDetails = () => {
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-gray-400">
-                Inclusive of all taxes. Free doorstep express shipping.
-              </p>
+
+              {/* Dynamic Shipping Fee Display */}
+              <div className="flex items-center gap-2 text-xs font-medium text-gray-600 pt-1.5 border-t border-gray-100">
+                <Truck className="w-4 h-4 text-luxury-accent shrink-0" />
+                <span>
+                  {(!product.shippingFee || product.shippingFee === 0) ? (
+                    <strong className="text-emerald-600">Free Express Doorstep Delivery</strong>
+                  ) : (
+                    <span>Shipping: <strong className="text-gray-800">₹{product.shippingFee}</strong></span>
+                  )}
+                  {' '}• 7-Day Doorstep Replacement
+                </span>
+              </div>
             </div>
 
             {/* Color Swatch Selection */}

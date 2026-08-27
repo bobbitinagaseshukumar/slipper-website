@@ -153,6 +153,35 @@ export const adminService = {
   updateStoreSettings: async (settingsData) => {
     return await api.put('/settings/admin', settingsData);
   },
+
+  // Homepage Sections & Festival Campaigns
+  getSections: async () => {
+    return await api.get('/admin/sections');
+  },
+
+  createSection: async (data) => {
+    return await api.post('/admin/sections', data);
+  },
+
+  updateSection: async (id, data) => {
+    return await api.patch(`/admin/sections/${id}`, data);
+  },
+
+  deleteSection: async (id) => {
+    return await api.delete(`/admin/sections/${id}`);
+  },
+
+  reorderSections: async (sectionOrders) => {
+    return await api.post('/admin/sections/reorder', { sectionOrders });
+  },
+
+  assignProductToSection: async (sectionId, productId) => {
+    return await api.post(`/admin/sections/${sectionId}/products`, { productId });
+  },
+
+  removeProductFromSection: async (sectionId, productId) => {
+    return await api.delete(`/admin/sections/${sectionId}/products/${productId}`);
+  },
 };
 
 export default adminService;

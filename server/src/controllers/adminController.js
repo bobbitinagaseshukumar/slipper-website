@@ -203,13 +203,21 @@ const createProduct = async (req, res, next) => {
       shortDescription,
       description,
       brand = 'AuraSole',
+      brandingType = 'Normal Branding',
       gender = 'UNISEX',
       productType = 'Slides',
       material,
       soleMaterial,
+      upperMaterial,
+      occasion,
       comfortFeatures,
+      careInstructions,
+      countryOfOrigin = 'India',
       price,
       originalPrice,
+      shippingFee = 0,
+      lowStockThreshold = 3,
+      status = 'PUBLISHED',
       categoryId,
       subcategoryId,
       isFeatured = false,
@@ -224,7 +232,7 @@ const createProduct = async (req, res, next) => {
     if (!name || name.trim().length < 2) {
       return errorResponse(res, 'Product name is required.', 422);
     }
-    if (!price || price <= 0) {
+    if (!price || parseFloat(price) <= 0) {
       return errorResponse(res, 'Valid selling price is required.', 422);
     }
 
@@ -242,41 +250,57 @@ const createProduct = async (req, res, next) => {
           slug: uniqueSlug,
           shortDescription,
           description: description || name,
-          brand,
+          brand: brand.trim(),
+          brandingType: brandingType || 'Normal Branding',
           gender,
           productType,
           material,
           soleMaterial,
+          upperMaterial,
+          occasion,
           comfortFeatures,
+          careInstructions,
+          countryOfOrigin: countryOfOrigin || 'India',
           price: parseFloat(price),
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discountPercentage:
-            originalPrice && originalPrice > price
-              ? Math.round(((originalPrice - price) / originalPrice) * 100)
+            originalPrice && parseFloat(originalPrice) > parseFloat(price)
+              ? Math.round(((parseFloat(originalPrice) - parseFloat(price)) / parseFloat(originalPrice)) * 100)
               : 0,
+          shippingFee: parseFloat(shippingFee) || 0,
+          lowStockThreshold: parseInt(lowStockThreshold, 10) || 3,
+          status: status || (isActive ? 'PUBLISHED' : 'DRAFT'),
           categoryId,
           subcategoryId: subcategoryId || null,
           isFeatured: Boolean(isFeatured),
           isTrending: Boolean(isTrending),
           isNewArrival: Boolean(isNewArrival),
           isBestSeller: Boolean(isBestSeller),
-          isActive: Boolean(isActive),
+          isActive: status === 'PUBLISHED' || Boolean(isActive),
           stock: variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0) || 20,
         },
       });
 
-      // Insert Images
+      // Insert Images (with colorName support)
       if (images && images.length > 0) {
         for (let i = 0; i < images.length; i++) {
-          await tx.productImage.create({
-            data: {
-              productId: created.id,
-              url: images[i].url,
-              altText: images[i].altText || `${name} view`,
-              isPrimary: i === 0 || images[i].isPrimary === true,
-              sortOrder: i,
-            },
-          });
+          const imgUrl = typeof images[i] === 'string' ? images[i] : images[i].url;
+          const imgColorName = typeof images[i] === 'object' ? images[i].colorName : null;
+          const imgAlt = typeof images[i] === 'object' ? images[i].altText : null;
+          const imgPrimary = typeof images[i] === 'object' ? Boolean(images[i].isPrimary) : i === 0;
+
+          if (imgUrl && imgUrl.trim().length > 3) {
+            await tx.productImage.create({
+              data: {
+                productId: created.id,
+                url: imgUrl.trim(),
+                altText: imgAlt || `${name} photo`,
+                colorName: imgColorName || null,
+                isPrimary: imgPrimary,
+                sortOrder: i,
+              },
+            });
+          }
         }
       }
 
@@ -289,9 +313,9 @@ const createProduct = async (req, res, next) => {
               size: String(v.size || '8'),
               colorName: v.colorName || 'Black',
               colorCode: v.colorCode || '#1A1A1A',
-              stock: parseInt(v.stock, 10) || 10,
+              stock: parseInt(v.stock, 10) || 0,
               priceOverride: v.priceOverride ? parseFloat(v.priceOverride) : null,
-              sku: `AS-${created.id.slice(0, 4)}-${v.size}-${v.colorName?.slice(0, 3)}`.toUpperCase(),
+              sku: v.sku || `AS-${created.id.slice(0, 4)}-${v.size}-${(v.colorName || 'DEF').slice(0, 3)}`.toUpperCase(),
             },
           });
         }
@@ -316,13 +340,21 @@ const updateProduct = async (req, res, next) => {
       shortDescription,
       description,
       brand,
+      brandingType,
       gender,
       productType,
       material,
       soleMaterial,
+      upperMaterial,
+      occasion,
       comfortFeatures,
+      careInstructions,
+      countryOfOrigin,
       price,
       originalPrice,
+      shippingFee,
+      lowStockThreshold,
+      status,
       categoryId,
       subcategoryId,
       isFeatured,
@@ -330,6 +362,7 @@ const updateProduct = async (req, res, next) => {
       isNewArrival,
       isBestSeller,
       isActive,
+      images,
       variants,
     } = req.body;
 
@@ -343,19 +376,30 @@ const updateProduct = async (req, res, next) => {
           ...(name && { name: name.trim() }),
           ...(shortDescription !== undefined && { shortDescription }),
           ...(description && { description }),
-          ...(brand && { brand }),
+          ...(brand && { brand: brand.trim() }),
+          ...(brandingType && { brandingType }),
           ...(gender && { gender }),
           ...(productType && { productType }),
           ...(material && { material }),
           ...(soleMaterial && { soleMaterial }),
+          ...(upperMaterial !== undefined && { upperMaterial }),
+          ...(occasion !== undefined && { occasion }),
           ...(comfortFeatures && { comfortFeatures }),
+          ...(careInstructions !== undefined && { careInstructions }),
+          ...(countryOfOrigin !== undefined && { countryOfOrigin }),
           ...(price && { price: parseFloat(price) }),
           ...(originalPrice !== undefined && {
             originalPrice: originalPrice ? parseFloat(originalPrice) : null,
             discountPercentage:
-              originalPrice && originalPrice > (price || existing.price)
-                ? Math.round(((originalPrice - (price || existing.price)) / originalPrice) * 100)
+              originalPrice && parseFloat(originalPrice) > (price || existing.price)
+                ? Math.round(((parseFloat(originalPrice) - (price || existing.price)) / parseFloat(originalPrice)) * 100)
                 : 0,
+          }),
+          ...(shippingFee !== undefined && { shippingFee: parseFloat(shippingFee) }),
+          ...(lowStockThreshold !== undefined && { lowStockThreshold: parseInt(lowStockThreshold, 10) }),
+          ...(status && {
+            status,
+            isActive: status === 'PUBLISHED',
           }),
           ...(categoryId && { categoryId }),
           ...(subcategoryId !== undefined && { subcategoryId: subcategoryId || null }),
@@ -367,21 +411,53 @@ const updateProduct = async (req, res, next) => {
         },
       });
 
-      // Update variant stock if provided
-      if (variants && Array.isArray(variants)) {
-        for (const v of variants) {
-          if (v.id) {
-            await tx.productVariant.update({
-              where: { id: v.id },
+      // If images array passed, replace product images
+      if (images && Array.isArray(images)) {
+        await tx.productImage.deleteMany({ where: { productId: id } });
+        for (let i = 0; i < images.length; i++) {
+          const imgUrl = typeof images[i] === 'string' ? images[i] : images[i].url;
+          const imgColorName = typeof images[i] === 'object' ? images[i].colorName : null;
+          const imgAlt = typeof images[i] === 'object' ? images[i].altText : null;
+          const imgPrimary = typeof images[i] === 'object' ? Boolean(images[i].isPrimary) : i === 0;
+
+          if (imgUrl && imgUrl.trim().length > 3) {
+            await tx.productImage.create({
               data: {
-                ...(v.stock !== undefined && { stock: parseInt(v.stock, 10) }),
-                ...(v.priceOverride !== undefined && {
-                  priceOverride: v.priceOverride ? parseFloat(v.priceOverride) : null,
-                }),
+                productId: id,
+                url: imgUrl.trim(),
+                altText: imgAlt || `${prod.name} photo`,
+                colorName: imgColorName || null,
+                isPrimary: imgPrimary,
+                sortOrder: i,
               },
             });
           }
         }
+      }
+
+      // If variants passed, update or recreate
+      if (variants && Array.isArray(variants) && variants.length > 0) {
+        await tx.productVariant.deleteMany({ where: { productId: id } });
+        for (const v of variants) {
+          await tx.productVariant.create({
+            data: {
+              productId: id,
+              size: String(v.size || '8'),
+              colorName: v.colorName || 'Black',
+              colorCode: v.colorCode || '#1A1A1A',
+              stock: parseInt(v.stock, 10) || 0,
+              priceOverride: v.priceOverride ? parseFloat(v.priceOverride) : null,
+              sku: v.sku || `AS-${id.slice(0, 4)}-${v.size}-${(v.colorName || 'DEF').slice(0, 3)}`.toUpperCase(),
+            },
+          });
+        }
+
+        // Recalculate total stock
+        const totalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
+        await tx.product.update({
+          where: { id },
+          data: { stock: totalStock },
+        });
       }
 
       return prod;
@@ -1070,6 +1146,262 @@ module.exports = {
       await prisma.category.delete({ where: { id } });
       await logAdminAction(req.user.id, 'CATEGORY_DELETED', { categoryId: id });
       return successResponse(res, 'Category deleted successfully.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ==========================================
+  // 13. HOMEPAGE SECTIONS & FESTIVAL CAMPAIGNS
+  // ==========================================
+
+  getAdminSections: async (req, res, next) => {
+    try {
+      const sections = await prisma.homepageSection.findMany({
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          products: {
+            orderBy: { sortOrder: 'asc' },
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  price: true,
+                  originalPrice: true,
+                  stock: true,
+                  images: {
+                    select: { url: true, isPrimary: true },
+                    orderBy: { sortOrder: 'asc' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return successResponse(res, 'Sections loaded successfully.', sections);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  createAdminSection: async (req, res, next) => {
+    try {
+      const {
+        title,
+        subtitle,
+        description,
+        type = 'CUSTOM',
+        bannerImage,
+        badgeText,
+        startDate,
+        endDate,
+        layout = 'GRID',
+        productLimit = 12,
+        sortMethod = 'MANUAL',
+        isActive = true,
+        productIds = [],
+      } = req.body;
+
+      if (!title || title.trim().length < 2) {
+        return errorResponse(res, 'Section title is required.', 422);
+      }
+
+      // Find max displayOrder
+      const maxOrderSection = await prisma.homepageSection.findFirst({
+        orderBy: { displayOrder: 'desc' },
+      });
+      const nextOrder = (maxOrderSection?.displayOrder || 0) + 1;
+
+      const created = await prisma.$transaction(async (tx) => {
+        const section = await tx.homepageSection.create({
+          data: {
+            title: title.trim(),
+            subtitle: subtitle ? subtitle.trim() : null,
+            description: description ? description.trim() : null,
+            type: type || 'CUSTOM',
+            bannerImage: bannerImage || null,
+            badgeText: badgeText ? badgeText.trim() : null,
+            startDate: startDate ? new Date(startDate) : null,
+            endDate: endDate ? new Date(endDate) : null,
+            layout: layout || 'GRID',
+            productLimit: parseInt(productLimit, 10) || 12,
+            sortMethod: sortMethod || 'MANUAL',
+            displayOrder: nextOrder,
+            isActive: Boolean(isActive),
+          },
+        });
+
+        if (productIds && productIds.length > 0) {
+          for (let i = 0; i < productIds.length; i++) {
+            await tx.homepageSectionProduct.create({
+              data: {
+                sectionId: section.id,
+                productId: productIds[i],
+                sortOrder: i,
+              },
+            });
+          }
+        }
+
+        return section;
+      });
+
+      await logAdminAction(req.user.id, 'HOMEPAGE_SECTION_CREATED', { sectionId: created.id, title: created.title });
+      return successResponse(res, 'Section created successfully.', created, 201);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  updateAdminSection: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const {
+        title,
+        subtitle,
+        description,
+        type,
+        bannerImage,
+        badgeText,
+        startDate,
+        endDate,
+        layout,
+        productLimit,
+        sortMethod,
+        displayOrder,
+        isActive,
+        productIds,
+      } = req.body;
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const section = await tx.homepageSection.update({
+          where: { id },
+          data: {
+            ...(title && { title: title.trim() }),
+            ...(subtitle !== undefined && { subtitle: subtitle ? subtitle.trim() : null }),
+            ...(description !== undefined && { description: description ? description.trim() : null }),
+            ...(type && { type }),
+            ...(bannerImage !== undefined && { bannerImage }),
+            ...(badgeText !== undefined && { badgeText: badgeText ? badgeText.trim() : null }),
+            ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+            ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
+            ...(layout && { layout }),
+            ...(productLimit !== undefined && { productLimit: parseInt(productLimit, 10) }),
+            ...(sortMethod && { sortMethod }),
+            ...(displayOrder !== undefined && { displayOrder: parseInt(displayOrder, 10) }),
+            ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+          },
+        });
+
+        if (productIds && Array.isArray(productIds)) {
+          await tx.homepageSectionProduct.deleteMany({ where: { sectionId: id } });
+          for (let i = 0; i < productIds.length; i++) {
+            await tx.homepageSectionProduct.create({
+              data: {
+                sectionId: id,
+                productId: productIds[i],
+                sortOrder: i,
+              },
+            });
+          }
+        }
+
+        return section;
+      });
+
+      await logAdminAction(req.user.id, 'HOMEPAGE_SECTION_UPDATED', { sectionId: id });
+      return successResponse(res, 'Section updated successfully.', updated);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  deleteAdminSection: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      // Deleting section only removes section-product relations, NOT the products themselves
+      await prisma.homepageSection.delete({ where: { id } });
+      await logAdminAction(req.user.id, 'HOMEPAGE_SECTION_DELETED', { sectionId: id });
+      return successResponse(res, 'Section removed successfully. Products remain safe in catalog.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  reorderAdminSections: async (req, res, next) => {
+    try {
+      const { sectionOrders } = req.body; // Array of { id, displayOrder }
+      if (!sectionOrders || !Array.isArray(sectionOrders)) {
+        return errorResponse(res, 'Invalid sectionOrders array.', 400);
+      }
+
+      await prisma.$transaction(
+        sectionOrders.map((item) =>
+          prisma.homepageSection.update({
+            where: { id: item.id },
+            data: { displayOrder: parseInt(item.displayOrder, 10) },
+          })
+        )
+      );
+
+      await logAdminAction(req.user.id, 'HOMEPAGE_SECTIONS_REORDERED', { count: sectionOrders.length });
+      return successResponse(res, 'Homepage layout reordered successfully.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  assignProductToSection: async (req, res, next) => {
+    try {
+      const { id } = req.params; // sectionId
+      const { productId } = req.body;
+
+      if (!productId) return errorResponse(res, 'Product ID is required.', 400);
+
+      // Check if already assigned
+      const existing = await prisma.homepageSectionProduct.findUnique({
+        where: {
+          sectionId_productId: {
+            sectionId: id,
+            productId,
+          },
+        },
+      });
+
+      if (existing) {
+        return successResponse(res, 'Product is already in this section.', existing);
+      }
+
+      const count = await prisma.homepageSectionProduct.count({ where: { sectionId: id } });
+      const record = await prisma.homepageSectionProduct.create({
+        data: {
+          sectionId: id,
+          productId,
+          sortOrder: count,
+        },
+      });
+
+      return successResponse(res, 'Product assigned to section.', record, 201);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  removeProductFromSection: async (req, res, next) => {
+    try {
+      const { id, productId } = req.params;
+      await prisma.homepageSectionProduct.deleteMany({
+        where: {
+          sectionId: id,
+          productId,
+        },
+      });
+
+      return successResponse(res, 'Product removed from section. Main catalog item untouched.');
     } catch (error) {
       next(error);
     }

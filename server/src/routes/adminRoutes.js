@@ -67,4 +67,13 @@ router.delete('/flash-sales/:id', adminController.deleteFlashSale);
 // 12. Audit Logs
 router.get('/audit-logs', adminController.getAdminAuditLogs);
 
+// 13. Homepage Sections & Festival Campaigns
+router.get('/sections', adminController.getAdminSections);
+router.post('/sections', adminController.createAdminSection);
+router.patch('/sections/:id', adminController.updateAdminSection);
+router.delete('/sections/:id', adminController.deleteAdminSection);
+router.post('/sections/reorder', adminController.reorderAdminSections);
+router.post('/sections/:id/products', adminController.assignProductToSection);
+router.delete('/sections/:id/products/:productId', adminController.removeProductFromSection);
+
 module.exports = router;

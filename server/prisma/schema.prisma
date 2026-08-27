@@ -189,7 +189,12 @@ model Product {
   price              Float
   originalPrice      Float?
   discountPercentage Float?           @default(0)
+  shippingFee        Float            @default(0)
+  brandingType       String           @default("Normal Branding") // Normal Branding, Company Branding, Private Label, Custom Branding
   stock              Int              @default(50)
+  lowStockThreshold  Int              @default(3)
+  status             String           @default("PUBLISHED") // DRAFT, PUBLISHED, UNPUBLISHED, ARCHIVED
+  countryOfOrigin    String?          @default("India")
   rating             Float            @default(5.0)
   reviewCount        Int              @default(0)
   isFeatured         Boolean          @default(false)
@@ -230,11 +235,14 @@ model ProductImage {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String
   altText   String?
+  colorName String?
+  variantId String?
   isPrimary Boolean  @default(false)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 
   @@index([productId])
+  @@index([colorName])
 }
 
 model ProductVariant {
@@ -462,7 +470,15 @@ model HomepageSection {
   id           String    @id @default(uuid())
   title        String
   subtitle     String?
-  type         String    // HERO_BANNER, CATEGORY_GRID, NEW_ARRIVALS, TRENDING, MENS_COLLECTION, WOMENS_COLLECTION, KIDS_COLLECTION, COMFORT_STORY, SPECIAL_OFFER, REVIEWS
+  description  String?
+  type         String    // HERO_BANNER, CATEGORY_GRID, NEW_ARRIVALS, TRENDING, MENS_COLLECTION, WOMENS_COLLECTION, KIDS_COLLECTION, COMFORT_STORY, SPECIAL_OFFER, FESTIVAL_SALE, FLASH_SALE, CUSTOM
+  bannerImage  String?
+  badgeText    String?
+  startDate    DateTime?
+  endDate      DateTime?
+  layout       String?   @default("GRID") // GRID, CAROUSEL, FEATURED
+  productLimit Int       @default(12)
+  sortMethod   String?   @default("MANUAL")
   displayOrder Int       @default(0)
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
@@ -472,6 +488,7 @@ model HomepageSection {
 
   @@index([type])
   @@index([isActive])
+  @@index([displayOrder])
 }
 
 model HomepageSectionProduct {

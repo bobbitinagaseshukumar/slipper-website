@@ -194,7 +194,7 @@ const getProducts = async (queryParams = {}) => {
         category: { select: { id: true, name: true, slug: true } },
         subcategory: { select: { id: true, name: true, slug: true } },
         images: {
-          select: { id: true, url: true, altText: true, isPrimary: true, sortOrder: true },
+          select: { id: true, url: true, altText: true, colorName: true, isPrimary: true, sortOrder: true },
           orderBy: { sortOrder: 'asc' },
         },
         variants: {
@@ -227,7 +227,7 @@ const getProductBySlug = async (slug) => {
       category: { select: { id: true, name: true, slug: true } },
       subcategory: { select: { id: true, name: true, slug: true } },
       images: {
-        select: { id: true, url: true, altText: true, isPrimary: true, sortOrder: true },
+        select: { id: true, url: true, altText: true, colorName: true, isPrimary: true, sortOrder: true },
         orderBy: { sortOrder: 'asc' },
       },
       variants: {
