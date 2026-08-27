@@ -1,9 +1,9 @@
-﻿services:
+services:
   - type: web
     name: aurasole-backend-api
     runtime: node
     rootDir: server
-    buildCommand: npm install && npx prisma generate
+    buildCommand: npm install --include=dev && npx prisma generate
     startCommand: npm start
     plan: free
     envVars:
