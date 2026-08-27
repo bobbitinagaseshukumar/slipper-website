@@ -126,40 +126,82 @@ model Address {
 }
 
 model Category {
-  id           String        @id @default(uuid())
-  name         String        @unique
-  slug         String        @unique
-  description  String?
-  image        String?
-  displayOrder Int           @default(0)
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  name            String        @unique
+  slug            String        @unique
+  description     String?
+  image           String?
+  imageAlt        String?
+  status          String        @default("PUBLISHED") // DRAFT, PUBLISHED, UNPUBLISHED, ARCHIVED
+  displayOrder    Int           @default(0)
+  showOnHomepage  Boolean       @default(true)
+  seoTitle        String?
+  seoDescription  String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  subCategories SubCategory[]
-  products      Product[]
+  subCategories   SubCategory[]
+  products        Product[]
 
   @@index([slug])
+  @@index([status])
+  @@index([displayOrder])
   @@index([isActive])
 }
 
 model SubCategory {
-  id           String    @id @default(uuid())
-  categoryId   String
-  category     Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  name         String
-  slug         String    @unique
-  description  String?
-  image        String?
-  displayOrder Int       @default(0)
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  categoryId      String
+  category        Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name            String
+  slug            String    @unique
+  description     String?
+  image           String?
+  imageAlt        String?
+  status          String    @default("PUBLISHED") // DRAFT, PUBLISHED, UNPUBLISHED, ARCHIVED
+  displayOrder    Int       @default(0)
+  showOnHomepage  Boolean       @default(false)
+  seoTitle        String?
+  seoDescription  String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  products     Product[]
+  products        Product[]
 
   @@index([categoryId])
   @@index([slug])
+  @@index([status])
+  @@index([displayOrder])
+  @@index([isActive])
+}
+
+model Brand {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  slug            String    @unique
+  description     String?
+  image           String?
+  imageAlt        String?
+  brandingType    String    @default("NORMAL") // NORMAL, COMPANY
+  status          String    @default("PUBLISHED") // DRAFT, PUBLISHED, UNPUBLISHED, ARCHIVED
+  displayOrder    Int       @default(0)
+  showOnHomepage  Boolean   @default(true)
+  showInSearch    Boolean   @default(true)
+  showInFilter    Boolean   @default(true)
+  seoTitle        String?
+  seoDescription  String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  products        Product[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([brandingType])
+  @@index([displayOrder])
   @@index([isActive])
 }
 
@@ -169,6 +211,8 @@ model Product {
   slug               String           @unique
   sku                String?          @unique
   brand              String           @default("AuraSole")
+  brandId            String?
+  brandRel           Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
   shortDescription   String?
   description        String
   categoryId         String
@@ -218,6 +262,7 @@ model Product {
   @@index([slug])
   @@index([categoryId])
   @@index([subcategoryId])
+  @@index([brandId])
   @@index([gender])
   @@index([price])
   @@index([rating])

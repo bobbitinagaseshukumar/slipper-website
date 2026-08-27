@@ -9,6 +9,7 @@ const getHomepageData = async (req, res, next) => {
     const [
       banners,
       categories,
+      brands,
       newArrivals,
       trending,
       bestSellers,
@@ -25,9 +26,9 @@ const getHomepageData = async (req, res, next) => {
         orderBy: { displayOrder: 'asc' },
       }),
 
-      // 2. Categories
+      // 2. Categories (Admin Published only)
       prisma.category.findMany({
-        where: { isActive: true },
+        where: { isActive: true, status: 'PUBLISHED', showOnHomepage: true },
         orderBy: { displayOrder: 'asc' },
         select: {
           id: true,
@@ -35,7 +36,24 @@ const getHomepageData = async (req, res, next) => {
           slug: true,
           description: true,
           image: true,
-          _count: { select: { products: { where: { isActive: true } } } },
+          imageAlt: true,
+          _count: { select: { products: { where: { isActive: true, status: 'PUBLISHED' } } } },
+        },
+      }),
+
+      // 3. Brands (Admin Published only)
+      prisma.brand.findMany({
+        where: { isActive: true, status: 'PUBLISHED', showOnHomepage: true },
+        orderBy: { displayOrder: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          image: true,
+          imageAlt: true,
+          brandingType: true,
+          _count: { select: { products: { where: { isActive: true, status: 'PUBLISHED' } } } },
         },
       }),
 
@@ -154,6 +172,7 @@ const getHomepageData = async (req, res, next) => {
     return successResponse(res, 'Homepage data loaded successfully', {
       banners,
       categories,
+      brands,
       newArrivals,
       trending,
       bestSellers,

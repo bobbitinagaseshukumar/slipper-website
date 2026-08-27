@@ -16,6 +16,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
+import categoryService from '../../services/categoryService';
+import brandService from '../../services/brandService';
 import SearchBar from './SearchBar';
 
 const Header = ({ onOpenMobileMenu }) => {
@@ -28,7 +30,29 @@ const Header = ({ onOpenMobileMenu }) => {
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [cartBounced, setCartBounced] = useState(false);
   const [wishlistBounced, setWishlistBounced] = useState(false);
+
+  // Dynamic Navigation from Neon DB (Published only)
+  const [navCategories, setNavCategories] = useState([]);
+  const [navBrands, setNavBrands] = useState([]);
+  const [activeDropdown, setActiveDropdown] = useState(null); // 'categories' | 'brands' | null
+
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchNavData = async () => {
+      try {
+        const [catsRes, brandsRes] = await Promise.all([
+          categoryService.getCategories(),
+          brandService.getBrands({ filterOnly: true }),
+        ]);
+        if (catsRes?.data) setNavCategories(catsRes.data);
+        if (brandsRes?.data) setNavBrands(brandsRes.data);
+      } catch (err) {
+        console.error('Failed to load navigation taxonomy:', err);
+      }
+    };
+    fetchNavData();
+  }, []);
 
   // Handle scroll shadow/glass effect
   useEffect(() => {
@@ -109,26 +133,74 @@ const Header = ({ onOpenMobileMenu }) => {
               </div>
             </Link>
 
-            {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-7 ml-2">
+            {/* Desktop Navigation Links (Loaded Dynamically from DB) */}
+            <nav className="hidden lg:flex items-center gap-6 ml-2">
               <NavLink to="/" className={navLinkClass}>
                 Home
               </NavLink>
               <NavLink to="/shop" className={navLinkClass}>
                 Shop All
               </NavLink>
-              <NavLink to="/shop?category=men" className={navLinkClass}>
-                Men
-              </NavLink>
-              <NavLink to="/shop?category=women" className={navLinkClass}>
-                Women
-              </NavLink>
-              <NavLink to="/shop?category=kids" className={navLinkClass}>
-                Kids
-              </NavLink>
-              <NavLink to="/shop?category=unisex" className={navLinkClass}>
-                Wellness & Ortho
-              </NavLink>
+
+              {navCategories.length > 0 ? (
+                navCategories.slice(0, 4).map((cat) => (
+                  <NavLink
+                    key={cat.id}
+                    to={`/shop?category=${cat.slug}`}
+                    className={navLinkClass}
+                  >
+                    {cat.name}
+                  </NavLink>
+                ))
+              ) : (
+                <>
+                  <NavLink to="/shop?category=men" className={navLinkClass}>
+                    Men
+                  </NavLink>
+                  <NavLink to="/shop?category=women" className={navLinkClass}>
+                    Women
+                  </NavLink>
+                  <NavLink to="/shop?category=kids" className={navLinkClass}>
+                    Kids
+                  </NavLink>
+                </>
+              )}
+
+              {/* Brands Nav with Dropdown */}
+              {navBrands.length > 0 && (
+                <div
+                  className="relative"
+                  onMouseEnter={() => setActiveDropdown('brands')}
+                  onMouseLeave={() => setActiveDropdown(null)}
+                >
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-gray-700 hover:text-luxury-accent transition-all flex items-center gap-1 py-1"
+                  >
+                    <span>Brands</span>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+
+                  {activeDropdown === 'brands' && (
+                    <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50 animate-in fade-in-50 zoom-in-95">
+                      {navBrands.slice(0, 6).map((b) => (
+                        <Link
+                          key={b.id}
+                          to={`/brand/${b.slug}`}
+                          onClick={() => setActiveDropdown(null)}
+                          className="flex items-center justify-between p-2 rounded-xl text-xs font-bold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
+                        >
+                          <span>{b.name}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            {b._count?.products || 0}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <NavLink to="/about" className={navLinkClass}>
                 About
               </NavLink>

@@ -2,21 +2,38 @@ const prisma = require('../config/db');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 
 /**
- * Get All Active Categories with Subcategories
+ * Get All Active, Published Categories with Subcategories (Customer-Facing)
  */
 const getCategories = async (req, res, next) => {
   try {
+    const { homepageOnly } = req.query;
+    const where = {
+      isActive: true,
+      status: 'PUBLISHED',
+    };
+    if (homepageOnly === 'true' || homepageOnly === true) {
+      where.showOnHomepage = true;
+    }
+
     const categories = await prisma.category.findMany({
-      where: { isActive: true },
+      where,
       orderBy: { displayOrder: 'asc' },
       include: {
         subCategories: {
-          where: { isActive: true },
+          where: { isActive: true, status: 'PUBLISHED' },
           orderBy: { displayOrder: 'asc' },
-          select: { id: true, name: true, slug: true, description: true, image: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            image: true,
+            imageAlt: true,
+            displayOrder: true,
+          },
         },
         _count: {
-          select: { products: { where: { isActive: true } } },
+          select: { products: { where: { isActive: true, status: 'PUBLISHED' } } },
         },
       },
     });
@@ -28,7 +45,7 @@ const getCategories = async (req, res, next) => {
 };
 
 /**
- * Get Category by Slug
+ * Get Category by Slug with its published subcategories (Customer-Facing)
  */
 const getCategoryBySlug = async (req, res, next) => {
   try {
@@ -37,14 +54,28 @@ const getCategoryBySlug = async (req, res, next) => {
       where: { slug: slug.toLowerCase() },
       include: {
         subCategories: {
-          where: { isActive: true },
+          where: { isActive: true, status: 'PUBLISHED' },
           orderBy: { displayOrder: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            image: true,
+            imageAlt: true,
+            _count: {
+              select: { products: { where: { isActive: true, status: 'PUBLISHED' } } },
+            },
+          },
+        },
+        _count: {
+          select: { products: { where: { isActive: true, status: 'PUBLISHED' } } },
         },
       },
     });
 
-    if (!category || !category.isActive) {
-      return errorResponse(res, 'Category not found', 404);
+    if (!category || !category.isActive || category.status !== 'PUBLISHED') {
+      return errorResponse(res, 'Category not found or currently unavailable.', 404);
     }
 
     return successResponse(res, 'Category details retrieved successfully', category);
@@ -53,7 +84,48 @@ const getCategoryBySlug = async (req, res, next) => {
   }
 };
 
+/**
+ * Get Subcategory by Category Slug and Subcategory Slug
+ */
+const getSubcategoryBySlug = async (req, res, next) => {
+  try {
+    const { categorySlug, subcategorySlug } = req.params;
+
+    const category = await prisma.category.findUnique({
+      where: { slug: categorySlug.toLowerCase() },
+    });
+
+    if (!category || !category.isActive || category.status !== 'PUBLISHED') {
+      return errorResponse(res, 'Parent category not found.', 404);
+    }
+
+    const subcategory = await prisma.subCategory.findFirst({
+      where: {
+        categoryId: category.id,
+        slug: subcategorySlug.toLowerCase(),
+        isActive: true,
+        status: 'PUBLISHED',
+      },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        _count: {
+          select: { products: { where: { isActive: true, status: 'PUBLISHED' } } },
+        },
+      },
+    });
+
+    if (!subcategory) {
+      return errorResponse(res, 'Subcategory not found.', 404);
+    }
+
+    return successResponse(res, 'Subcategory retrieved successfully', subcategory);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCategories,
   getCategoryBySlug,
+  getSubcategoryBySlug,
 };

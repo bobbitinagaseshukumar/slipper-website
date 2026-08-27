@@ -1,13 +1,13 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Tag, ArrowRight, Sparkles } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Search, Tag, ArrowRight, Sparkles, FolderTree, ShoppingBag } from 'lucide-react';
 
 const SearchSuggestions = ({ suggestions, query, onClose, isVisible }) => {
   const navigate = useNavigate();
 
   if (!isVisible || !query || query.trim().length < 2) return null;
 
-  const { products = [], categories = [], keywords = [] } = suggestions;
+  const { products = [], categories = [], subcategories = [], brands = [], keywords = [] } = suggestions;
 
   const handleProductClick = (slug) => {
     onClose();
@@ -19,12 +19,27 @@ const SearchSuggestions = ({ suggestions, query, onClose, isVisible }) => {
     navigate(`/shop?category=${slug}`);
   };
 
+  const handleSubcategoryClick = (catSlug, subSlug) => {
+    onClose();
+    navigate(`/shop?category=${catSlug}&subcategory=${subSlug}`);
+  };
+
+  const handleBrandClick = (slug) => {
+    onClose();
+    navigate(`/brand/${slug}`);
+  };
+
   const handleSearchSubmit = (searchTerm) => {
     onClose();
     navigate(`/shop?q=${encodeURIComponent(searchTerm)}`);
   };
 
-  const hasResults = products.length > 0 || categories.length > 0 || keywords.length > 0;
+  const hasResults =
+    products.length > 0 ||
+    categories.length > 0 ||
+    subcategories.length > 0 ||
+    brands.length > 0 ||
+    keywords.length > 0;
 
   return (
     <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100/80 p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
@@ -40,11 +55,39 @@ const SearchSuggestions = ({ suggestions, query, onClose, isVisible }) => {
         </div>
       ) : (
         <div className="space-y-4 max-h-[70vh] overflow-y-auto no-scrollbar">
-          {/* Categories */}
+          {/* Brands Section */}
+          {brands.length > 0 && (
+            <div>
+              <div className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2 flex items-center gap-1">
+                <Tag className="w-3 h-3 text-luxury-accent" /> Brands
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {brands.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => handleBrandClick(b.slug)}
+                    className="flex items-center gap-2 px-3 py-1 bg-stone-900 text-white hover:bg-luxury-accent hover:text-stone-950 rounded-full text-xs font-bold transition-colors border border-stone-800"
+                  >
+                    {b.image && (
+                      <img src={b.image} alt={b.name} className="w-4 h-4 object-contain rounded" />
+                    )}
+                    <span>{b.name}</span>
+                    {b.brandingType === 'COMPANY' && (
+                      <span className="text-[9px] bg-luxury-accent text-stone-950 px-1.5 rounded font-black">
+                        Company
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Categories Section */}
           {categories.length > 0 && (
             <div>
               <div className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2 flex items-center gap-1">
-                <Tag className="w-3 h-3 text-luxury-accent" /> Categories
+                <FolderTree className="w-3 h-3 text-luxury-accent" /> Categories
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {categories.map((cat) => (
@@ -60,7 +103,27 @@ const SearchSuggestions = ({ suggestions, query, onClose, isVisible }) => {
             </div>
           )}
 
-          {/* Keywords */}
+          {/* Subcategories Section */}
+          {subcategories.length > 0 && (
+            <div>
+              <div className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2 flex items-center gap-1">
+                <FolderTree className="w-3 h-3 text-luxury-accent" /> Subcategories
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {subcategories.map((sub) => (
+                  <button
+                    key={sub.id}
+                    onClick={() => handleSubcategoryClick(sub.category?.slug, sub.slug)}
+                    className="px-3 py-1 bg-luxury-warmWhite hover:bg-luxury-accent hover:text-white rounded-full text-xs font-medium text-gray-700 transition-colors border border-gray-200/60"
+                  >
+                    {sub.name} <span className="text-[10px] text-gray-400">({sub.category?.name})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Keywords Section */}
           {keywords.length > 0 && (
             <div>
               <div className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2 flex items-center gap-1">
@@ -97,15 +160,24 @@ const SearchSuggestions = ({ suggestions, query, onClose, isVisible }) => {
                     onClick={() => handleProductClick(prod.slug)}
                     className="flex items-center gap-3 p-2 rounded-xl hover:bg-luxury-warmWhite/80 transition-all text-left border border-transparent hover:border-gray-200/50 group"
                   >
-                    <img
-                      src={prod.images?.[0]?.url || 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=200'}
-                      alt={prod.name}
-                      className="w-12 h-12 rounded-lg object-cover bg-gray-100 shrink-0 group-hover:scale-105 transition-transform"
-                    />
+                    <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center border border-gray-200">
+                      {prod.images?.[0]?.url ? (
+                        <img
+                          src={prod.images[0].url}
+                          alt={prod.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <ShoppingBag className="w-5 h-5 text-gray-400" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-gray-900 truncate group-hover:text-luxury-accent transition-colors">
                         {prod.name}
                       </p>
+                      {prod.brand && (
+                        <p className="text-[10px] text-gray-400 truncate">{prod.brand}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-bold text-luxury-dark">₹{prod.price}</span>
                         {prod.originalPrice && (
@@ -128,7 +200,7 @@ const SearchSuggestions = ({ suggestions, query, onClose, isVisible }) => {
           <div className="pt-2 border-t border-gray-100 text-center">
             <button
               onClick={() => handleSearchSubmit(query)}
-              className="w-full py-2 bg-luxury-dark text-white hover:bg-luxury-accent rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2 bg-luxury-dark text-white hover:bg-luxury-accent rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow"
             >
               <Search className="w-3.5 h-3.5" /> View all results for "{query}"
             </button>

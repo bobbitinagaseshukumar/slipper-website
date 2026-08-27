@@ -55,7 +55,7 @@ const AdminSidebar = ({
         { id: 'orders', label: 'Orders', icon: ShoppingBag },
         { id: 'products', label: 'Products', icon: Package },
         { id: 'categories', label: 'Categories', icon: FolderTree },
-        { id: 'subcategories', label: 'Subcategories', icon: Folder },
+        { id: 'brands', label: 'Brands', icon: Tag },
         { id: 'inventory', label: 'Inventory', icon: Archive },
       ],
     },

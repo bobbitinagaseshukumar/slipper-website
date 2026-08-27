@@ -73,6 +73,25 @@ const getProducts = async (queryParams = {}) => {
     };
   }
 
+  // Brand filter (by brandId, brand name, or brand slug)
+  if (brand) {
+    const brands = Array.isArray(brand) ? brand : brand.split(',');
+    where.OR = (where.OR || []).concat(
+      brands.map((b) => ({
+        OR: [
+          { brandId: b.trim() },
+          { brand: { equals: b.trim(), mode: 'insensitive' } },
+          { brandRel: { slug: { equals: b.trim().toLowerCase(), mode: 'insensitive' } } },
+        ],
+      }))
+    );
+  }
+
+  // Branding Type filter
+  if (brandingType) {
+    where.brandingType = { contains: brandingType.trim(), mode: 'insensitive' };
+  }
+
   // Gender filter (MEN, WOMEN, KIDS, UNISEX)
   if (gender) {
     const genderArray = Array.isArray(gender) ? gender : gender.split(',');
@@ -193,6 +212,7 @@ const getProducts = async (queryParams = {}) => {
       include: {
         category: { select: { id: true, name: true, slug: true } },
         subcategory: { select: { id: true, name: true, slug: true } },
+        brandRel: { select: { id: true, name: true, slug: true, image: true, brandingType: true } },
         images: {
           select: { id: true, url: true, altText: true, colorName: true, isPrimary: true, sortOrder: true },
           orderBy: { sortOrder: 'asc' },
@@ -226,6 +246,7 @@ const getProductBySlug = async (slug) => {
     include: {
       category: { select: { id: true, name: true, slug: true } },
       subcategory: { select: { id: true, name: true, slug: true } },
+      brandRel: { select: { id: true, name: true, slug: true, image: true, brandingType: true } },
       images: {
         select: { id: true, url: true, altText: true, colorName: true, isPrimary: true, sortOrder: true },
         orderBy: { sortOrder: 'asc' },
@@ -298,7 +319,7 @@ const getSuggestions = async (query) => {
 
   const term = query.trim();
 
-  const [products, categories] = await Promise.all([
+  const [products, categories, subcategories, brands] = await Promise.all([
     prisma.product.findMany({
       where: {
         isActive: true,
@@ -313,6 +334,7 @@ const getSuggestions = async (query) => {
         id: true,
         name: true,
         slug: true,
+        brand: true,
         price: true,
         originalPrice: true,
         discountPercentage: true,
@@ -328,9 +350,34 @@ const getSuggestions = async (query) => {
     prisma.category.findMany({
       where: {
         isActive: true,
+        status: 'PUBLISHED',
         name: { contains: term, mode: 'insensitive' },
       },
-      select: { id: true, name: true, slug: true },
+      select: { id: true, name: true, slug: true, image: true },
+      take: 4,
+    }),
+    prisma.subCategory.findMany({
+      where: {
+        isActive: true,
+        status: 'PUBLISHED',
+        name: { contains: term, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        category: { select: { name: true, slug: true } },
+      },
+      take: 4,
+    }),
+    prisma.brand.findMany({
+      where: {
+        isActive: true,
+        status: 'PUBLISHED',
+        showInSearch: true,
+        name: { contains: term, mode: 'insensitive' },
+      },
+      select: { id: true, name: true, slug: true, image: true, brandingType: true },
       take: 4,
     }),
   ]);
@@ -338,6 +385,8 @@ const getSuggestions = async (query) => {
   return {
     products,
     categories,
+    subcategories,
+    brands,
     keywords: [
       `${term} slides`,
       `${term} comfort slippers`,
@@ -351,14 +400,31 @@ const getSuggestions = async (query) => {
  * Get Dynamic Filter Options metadata
  */
 const getFilterOptions = async () => {
-  const [categories, variants, materials, maxProductPrice, minProductPrice] = await Promise.all([
+  const [categories, brands, variants, materials, maxProductPrice, minProductPrice] = await Promise.all([
     prisma.category.findMany({
-      where: { isActive: true },
+      where: { isActive: true, status: 'PUBLISHED' },
       select: {
         id: true,
         name: true,
         slug: true,
-        _count: { select: { products: { where: { isActive: true } } } },
+        subCategories: {
+          where: { isActive: true, status: 'PUBLISHED' },
+          select: { id: true, name: true, slug: true },
+          orderBy: { displayOrder: 'asc' },
+        },
+        _count: { select: { products: { where: { isActive: true, status: 'PUBLISHED' } } } },
+      },
+      orderBy: { displayOrder: 'asc' },
+    }),
+    prisma.brand.findMany({
+      where: { isActive: true, status: 'PUBLISHED', showInFilter: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        brandingType: true,
+        image: true,
+        _count: { select: { products: { where: { isActive: true, status: 'PUBLISHED' } } } },
       },
       orderBy: { displayOrder: 'asc' },
     }),
@@ -410,9 +476,11 @@ const getFilterOptions = async () => {
 
   return {
     categories,
+    brands,
     sizes,
     colors,
     genders: ['MEN', 'WOMEN', 'KIDS', 'UNISEX'],
+    brandingTypes: ['Normal Branding', 'Company Branding'],
     materials: uniqueMaterials,
     occasions: uniqueOccasions,
     productTypes: uniqueTypes,

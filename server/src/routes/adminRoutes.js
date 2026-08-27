@@ -18,16 +18,28 @@ router.patch('/products/:id', adminController.updateProduct);
 router.delete('/products/:id', adminController.deleteProduct);
 
 // 3. Categories
+router.get('/categories', adminController.getAdminCategories);
 router.post('/categories', adminController.createCategory);
 router.patch('/categories/:id', adminController.updateCategory);
 router.delete('/categories/:id', adminController.deleteCategory);
+router.post('/categories/reorder', adminController.reorderCategories);
 
 // 4. Subcategories
 router.get('/subcategories', adminController.getSubCategories);
 router.post('/subcategories', adminController.createSubCategory);
+router.patch('/subcategories/:id', adminController.updateSubCategory);
 router.delete('/subcategories/:id', adminController.deleteSubCategory);
+router.post('/subcategories/reorder', adminController.reorderSubCategories);
 
-// 4. Orders
+// 5. Brands (NORMAL & COMPANY BRANDING)
+router.get('/brands', adminController.getAdminBrands);
+router.post('/brands', adminController.createBrand);
+router.patch('/brands/:id', adminController.updateBrand);
+router.delete('/brands/:id', adminController.deleteBrand);
+router.post('/brands/reorder', adminController.reorderBrands);
+router.get('/brands/:id/products', adminController.getBrandProducts);
+
+// 6. Orders
 router.get('/orders', adminController.getAdminOrders);
 router.patch('/orders/:id/status', adminController.updateOrderStatus);
 

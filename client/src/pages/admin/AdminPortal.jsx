@@ -54,6 +54,7 @@ import AdminSidebar from '../../components/admin/AdminSidebar';
 import AdminHeader from '../../components/admin/AdminHeader';
 import AdminEmailCenter from '../../components/admin/AdminEmailCenter';
 import AdminCategoryManager from '../../components/admin/AdminCategoryManager';
+import AdminBrandManager from '../../components/admin/AdminBrandManager';
 import AdminProductModal from '../../components/admin/AdminProductModal';
 import AdminSectionManager from '../../components/admin/AdminSectionManager';
 
@@ -1012,7 +1013,7 @@ const AdminPortal = () => {
           )}
 
           {/* ======================================================== */}
-          {/* 3.5 CATEGORIES TAB */}
+          {/* 3.5 CATEGORIES & SUBCATEGORIES TAB */}
           {/* ======================================================== */}
           {activeTab === 'categories' && (
             <AdminCategoryManager
@@ -1020,6 +1021,13 @@ const AdminPortal = () => {
               onRefresh={loadCategories}
               showToast={showToast}
             />
+          )}
+
+          {/* ======================================================== */}
+          {/* 3.6 BRANDS TAB (NORMAL & COMPANY BRANDING) */}
+          {/* ======================================================== */}
+          {activeTab === 'brands' && (
+            <AdminBrandManager showToast={showToast} />
           )}
 
           {/* ======================================================== */}

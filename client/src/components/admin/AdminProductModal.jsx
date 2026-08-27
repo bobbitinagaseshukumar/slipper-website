@@ -85,10 +85,15 @@ const AdminProductModal = ({
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropTargetColor, setCropTargetColor] = useState('');
 
+  // Dynamic Brands and Subcategories from DB
+  const [dbBrands, setDbBrands] = useState([]);
+  const [dbSubcategories, setDbSubcategories] = useState([]);
+
   // Form State
   const [formData, setFormData] = useState({
     name: '',
     brand: 'AuraSole',
+    brandId: '',
     brandingType: 'Normal Branding',
     sku: '',
     categoryId: '',
@@ -148,6 +153,25 @@ const AdminProductModal = ({
   const [previewSelectedImage, setPreviewSelectedImage] = useState('');
   const [previewSelectedSize, setPreviewSelectedSize] = useState('8');
 
+  // Load brands and subcategories
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchMeta = async () => {
+      try {
+        const [brandsRes, subsRes] = await Promise.all([
+          adminService.getBrands(),
+          adminService.getSubCategories(),
+        ]);
+        if (brandsRes?.data) setDbBrands(brandsRes.data);
+        if (subsRes?.data) setDbSubcategories(subsRes.data);
+      } catch (err) {
+        console.error('Failed to load modal metadata:', err);
+      }
+    };
+    fetchMeta();
+  }, [isOpen]);
+
   useEffect(() => {
     if (editingProduct) {
       // Extract unique colors from editingProduct variants
@@ -191,6 +215,7 @@ const AdminProductModal = ({
       setFormData({
         name: editingProduct.name || '',
         brand: editingProduct.brand || 'AuraSole',
+        brandId: editingProduct.brandId || '',
         brandingType: editingProduct.brandingType || 'Normal Branding',
         sku: editingProduct.sku || '',
         categoryId: editingProduct.categoryId || (categories[0]?.id || ''),
@@ -226,6 +251,7 @@ const AdminProductModal = ({
       setFormData({
         name: '',
         brand: 'AuraSole',
+        brandId: '',
         brandingType: 'Normal Branding',
         sku: `AURA-${Math.floor(1000 + Math.random() * 9000)}`,
         categoryId: categories[0]?.id || '',
@@ -452,6 +478,7 @@ const AdminProductModal = ({
       const payload = {
         name: formData.name.trim(),
         brand: formData.brand.trim() || 'AuraSole',
+        brandId: formData.brandId || null,
         brandingType: formData.brandingType,
         sku: formData.sku.trim() || undefined,
         price: parseFloat(formData.price),
@@ -612,42 +639,81 @@ const AdminProductModal = ({
               {/* Branding Section */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-stone-950/60 border border-stone-800 rounded-2xl">
                 <div>
+                  <label className="block text-stone-400 font-bold uppercase mb-1">Footwear Brand *</label>
+                  <select
+                    value={formData.brandId || (formData.brand ? '__custom__' : '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__custom__') {
+                        setFormData({ ...formData, brandId: '', brand: '' });
+                      } else {
+                        const selected = dbBrands.find((b) => b.id === val);
+                        if (selected) {
+                          setFormData({
+                            ...formData,
+                            brandId: selected.id,
+                            brand: selected.name,
+                            brandingType: selected.brandingType === 'COMPANY' ? 'Company Branding' : 'Normal Branding',
+                          });
+                        } else {
+                          setFormData({ ...formData, brandId: '', brand: 'AuraSole' });
+                        }
+                      }
+                    }}
+                    className="w-full bg-stone-900 border border-stone-700 rounded-xl px-3.5 py-2 text-white font-bold focus:border-luxury-accent outline-none"
+                  >
+                    <option value="">Select Managed Brand</option>
+                    {dbBrands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.brandingType === 'COMPANY' ? 'Company' : 'Normal'})
+                      </option>
+                    ))}
+                    <option value="__custom__">+ Enter Custom Brand Name</option>
+                  </select>
+
+                  {(!formData.brandId || formData.brandId === '') && (
+                    <input
+                      type="text"
+                      value={formData.brand}
+                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                      placeholder="Enter Brand Name (e.g. AuraSole)"
+                      className="w-full bg-stone-900 border border-stone-700 rounded-xl px-3.5 py-1.5 text-white text-xs mt-2 focus:border-luxury-accent outline-none"
+                    />
+                  )}
+                </div>
+
+                <div>
                   <label className="block text-stone-400 font-bold uppercase mb-1">Branding Type *</label>
                   <select
                     value={formData.brandingType}
                     onChange={(e) => setFormData({ ...formData, brandingType: e.target.value })}
                     className="w-full bg-stone-900 border border-stone-700 rounded-xl px-3.5 py-2 text-white font-bold focus:border-luxury-accent outline-none"
                   >
-                    {BRANDING_TYPES.map((bt) => (
-                      <option key={bt} value={bt}>
-                        {bt}
-                      </option>
-                    ))}
+                    <option value="Normal Branding">Normal Branding (Standard Line)</option>
+                    <option value="Company Branding">Company Branding (Flagship Brand)</option>
+                    <option value="Private Label">Private Label</option>
+                    <option value="Custom Branding">Custom Branding</option>
                   </select>
                   <span className="text-[10px] text-stone-500 mt-1 block">
-                    Choose whether this product features Company Branding, Normal Branding, or Private Label.
+                    Distinguish between Company Branding and Normal Branding models.
                   </span>
-                </div>
-
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase mb-1">Brand Name</label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    placeholder="AuraSole"
-                    className="w-full bg-stone-900 border border-stone-700 rounded-xl px-3.5 py-2 text-white focus:border-luxury-accent outline-none"
-                  />
                 </div>
               </div>
 
-              {/* Category, Gender, Product Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Category, Subcategory, Gender, Product Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-stone-400 font-bold uppercase mb-1">Category *</label>
                   <select
                     value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    onChange={(e) => {
+                      const newCatId = e.target.value;
+                      setFormData({
+                        ...formData,
+                        categoryId: newCatId,
+                        subcategoryId: '', // Reset subcategory when category changes
+                      });
+                    }}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3.5 py-2.5 text-white focus:border-luxury-accent outline-none font-bold"
                   >
                     {categories.map((c) => (
@@ -655,6 +721,24 @@ const AdminProductModal = ({
                         {c.name}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-stone-400 font-bold uppercase mb-1">Subcategory</label>
+                  <select
+                    value={formData.subcategoryId || ''}
+                    onChange={(e) => setFormData({ ...formData, subcategoryId: e.target.value })}
+                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3.5 py-2.5 text-white focus:border-luxury-accent outline-none font-bold"
+                  >
+                    <option value="">None (Top-Level Category)</option>
+                    {dbSubcategories
+                      .filter((s) => s.categoryId === formData.categoryId)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
 

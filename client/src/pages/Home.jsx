@@ -14,6 +14,7 @@ import RevealOnScroll from '../components/common/RevealOnScroll';
 
 import HeroSection from '../components/home/HeroSection';
 import CategoryGrid from '../components/home/CategoryGrid';
+import ShopByBrand from '../components/home/ShopByBrand';
 import FlashSaleBanner from '../components/home/FlashSaleBanner';
 import SlipperShowcase from '../components/home/SlipperShowcase';
 import ShowroomSpotlight from '../components/home/ShowroomSpotlight';
@@ -53,6 +54,7 @@ const Home = () => {
   const settings = data?.settings || {};
   const banners = data?.banners || [];
   const categories = data?.categories || [];
+  const brands = data?.brands || [];
   const newArrivals = data?.newArrivals || [];
   const trending = data?.trending || [];
   const collections = data?.collections || {};
@@ -79,6 +81,9 @@ const Home = () => {
 
         {/* Categories Showcase with 3D Tilt Cards */}
         <CategoryGrid categories={categories} />
+
+        {/* Footwear Brands Showcase (Admin Uploaded & Cropped) */}
+        <ShopByBrand brands={brands} />
 
         {/* Dynamic Admin-Configured Festival & Custom Sections */}
         {dynamicSections && dynamicSections.length > 0 && (

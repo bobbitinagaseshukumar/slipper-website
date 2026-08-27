@@ -35,16 +35,21 @@ const CategoryCard = ({ category }) => {
       }}
       className="group relative rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-shadow duration-500 bg-stone-100 border border-gray-100 block aspect-[3/4] will-change-transform transform-gpu active:scale-[0.98]"
     >
-      {/* Category Image with Smooth Zoom */}
-      <img
-        src={
-          category.image ||
-          'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=600'
-        }
-        alt={category.name}
-        className="w-full h-full object-cover group-hover:scale-112 transition-transform duration-700 ease-out"
-        loading="lazy"
-      />
+      {/* Category Image with Smooth Zoom (Admin Uploaded) */}
+      {category.image ? (
+        <img
+          src={category.image}
+          alt={category.imageAlt || category.name}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+          loading="lazy"
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-stone-900 via-stone-800 to-stone-950 flex items-center justify-center p-6 text-stone-600">
+          <span className="font-display font-black text-2xl text-stone-700 tracking-wider uppercase">
+            {category.name}
+          </span>
+        </div>
+      )}
 
       {/* Dark Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent transition-opacity duration-300 group-hover:opacity-95" />

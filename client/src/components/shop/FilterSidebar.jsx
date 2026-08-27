@@ -16,6 +16,7 @@ const FilterSidebar = ({
 
   const {
     categories = [],
+    brands = [],
     sizes = [],
     colors = [],
     materials = [],
@@ -24,6 +25,9 @@ const FilterSidebar = ({
   } = filterOptions;
 
   const currentCategory = filters.category || '';
+  const currentSubcategory = filters.subcategory || '';
+  const currentBrands = filters.brand ? filters.brand.split(',') : [];
+  const currentBrandingType = filters.brandingType || '';
   const currentGenders = filters.gender ? filters.gender.split(',') : [];
   const currentSizes = filters.size ? filters.size.split(',') : [];
   const currentColors = filters.color ? filters.color.split(',') : [];
@@ -33,6 +37,12 @@ const FilterSidebar = ({
   const currentRating = filters.rating || '';
   const currentDiscount = filters.minDiscount || '';
   const inStockOnly = filters.inStockOnly === 'true';
+
+  // Find active category's subcategories
+  const activeCategoryObj = categories.find(
+    (c) => c.slug === currentCategory || c.id === currentCategory
+  );
+  const availableSubcategories = activeCategoryObj?.subCategories || [];
 
   // Toggle multi-select values (comma separated)
   const handleMultiSelectToggle = (filterKey, value) => {
@@ -69,7 +79,7 @@ const FilterSidebar = ({
         )}
       </div>
 
-      {/* 1. Category Filter */}
+      {/* 1. Category & Subcategory Filter */}
       <div>
         <button
           onClick={() => toggleSection('category')}
@@ -81,7 +91,10 @@ const FilterSidebar = ({
         {!collapsedSections.category && (
           <div className="space-y-1.5">
             <button
-              onClick={() => onFilterChange('category', '')}
+              onClick={() => {
+                onFilterChange('category', '');
+                onFilterChange('subcategory', '');
+              }}
               className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors flex items-center justify-between ${
                 !currentCategory ? 'bg-luxury-dark text-white font-bold' : 'text-gray-600 hover:bg-gray-50'
               }`}
@@ -89,21 +102,121 @@ const FilterSidebar = ({
               <span>All Categories</span>
             </button>
             {categories.map((cat) => (
+              <div key={cat.id} className="space-y-1">
+                <button
+                  onClick={() => {
+                    onFilterChange('category', cat.slug);
+                    onFilterChange('subcategory', '');
+                  }}
+                  className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors flex items-center justify-between ${
+                    currentCategory === cat.slug
+                      ? 'bg-luxury-dark text-white font-bold'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>{cat.name}</span>
+                  {cat._count?.products !== undefined && (
+                    <span className={`text-[10px] ${currentCategory === cat.slug ? 'text-luxury-accent' : 'text-gray-400'}`}>
+                      {cat._count.products}
+                    </span>
+                  )}
+                </button>
+
+                {/* Subcategories under current category */}
+                {currentCategory === cat.slug && cat.subCategories?.length > 0 && (
+                  <div className="pl-4 py-1 space-y-1 border-l-2 border-luxury-accent/30 ml-2">
+                    {cat.subCategories.map((sub) => (
+                      <button
+                        key={sub.id}
+                        onClick={() => onFilterChange('subcategory', currentSubcategory === sub.slug ? '' : sub.slug)}
+                        className={`w-full text-left px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors flex items-center justify-between ${
+                          currentSubcategory === sub.slug
+                            ? 'bg-luxury-accent text-luxury-dark font-black'
+                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span>• {sub.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Footwear Brands Filter */}
+      {brands.length > 0 && (
+        <div className="pt-4 border-t border-gray-100">
+          <button
+            onClick={() => toggleSection('brand')}
+            className="w-full flex items-center justify-between text-xs font-bold text-gray-900 uppercase tracking-wider mb-3"
+          >
+            <span>Brands</span>
+            {collapsedSections.brand ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+          {!collapsedSections.brand && (
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {brands.map((b) => {
+                const isSelected = currentBrands.includes(b.slug) || currentBrands.includes(b.name);
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => handleMultiSelectToggle('brand', b.slug)}
+                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-luxury-accent text-luxury-dark font-black shadow-xs'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="truncate">{b.name}</span>
+                      {b.brandingType === 'COMPANY' && (
+                        <span className="text-[9px] px-1.5 py-0.2 bg-stone-900 text-white rounded font-bold">
+                          Company
+                        </span>
+                      )}
+                    </div>
+                    {b._count?.products !== undefined && (
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        {b._count.products}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. Branding Type Filter */}
+      <div className="pt-4 border-t border-gray-100">
+        <button
+          onClick={() => toggleSection('brandingType')}
+          className="w-full flex items-center justify-between text-xs font-bold text-gray-900 uppercase tracking-wider mb-3"
+        >
+          <span>Branding Type</span>
+          {collapsedSections.brandingType ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        </button>
+        {!collapsedSections.brandingType && (
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: '', label: 'All' },
+              { id: 'Normal', label: 'Normal' },
+              { id: 'Company', label: 'Company' },
+            ].map((bt) => (
               <button
-                key={cat.id}
-                onClick={() => onFilterChange('category', cat.slug)}
-                className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium transition-colors flex items-center justify-between ${
-                  currentCategory === cat.slug
-                    ? 'bg-luxury-dark text-white font-bold'
-                    : 'text-gray-600 hover:bg-gray-50'
+                key={bt.id}
+                onClick={() => onFilterChange('brandingType', bt.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  currentBrandingType === bt.id
+                    ? 'bg-luxury-dark border-luxury-dark text-white shadow-xs'
+                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
                 }`}
               >
-                <span>{cat.name}</span>
-                {cat._count?.products !== undefined && (
-                  <span className={`text-[10px] ${currentCategory === cat.slug ? 'text-luxury-accent' : 'text-gray-400'}`}>
-                    {cat._count.products}
-                  </span>
-                )}
+                {bt.label}
               </button>
             ))}
           </div>

@@ -203,6 +203,7 @@ const createProduct = async (req, res, next) => {
       shortDescription,
       description,
       brand = 'AuraSole',
+      brandId,
       brandingType = 'Normal Branding',
       gender = 'UNISEX',
       productType = 'Slides',
@@ -235,6 +236,24 @@ const createProduct = async (req, res, next) => {
     if (!price || parseFloat(price) <= 0) {
       return errorResponse(res, 'Valid selling price is required.', 422);
     }
+    if (!categoryId) {
+      return errorResponse(res, 'Product category is required.', 422);
+    }
+
+    // Validate that subcategory belongs to category
+    if (subcategoryId) {
+      const sub = await prisma.subCategory.findUnique({ where: { id: subcategoryId } });
+      if (!sub || sub.categoryId !== categoryId) {
+        return errorResponse(res, 'The selected subcategory does not belong to the selected category.', 422);
+      }
+    }
+
+    // Resolve brand name from brandId if provided
+    let resolvedBrand = brand ? brand.trim() : 'AuraSole';
+    if (brandId) {
+      const b = await prisma.brand.findUnique({ where: { id: brandId } });
+      if (b) resolvedBrand = b.name;
+    }
 
     // Generate clean unique slug
     const baseSlug = name
@@ -250,7 +269,8 @@ const createProduct = async (req, res, next) => {
           slug: uniqueSlug,
           shortDescription,
           description: description || name,
-          brand: brand.trim(),
+          brand: resolvedBrand,
+          brandId: brandId || null,
           brandingType: brandingType || 'Normal Branding',
           gender,
           productType,
@@ -340,6 +360,7 @@ const updateProduct = async (req, res, next) => {
       shortDescription,
       description,
       brand,
+      brandId,
       brandingType,
       gender,
       productType,
@@ -369,6 +390,23 @@ const updateProduct = async (req, res, next) => {
     const existing = await prisma.product.findUnique({ where: { id } });
     if (!existing) return errorResponse(res, 'Product not found.', 404);
 
+    const targetCategoryId = categoryId || existing.categoryId;
+
+    // Validate that subcategory belongs to category
+    if (subcategoryId) {
+      const sub = await prisma.subCategory.findUnique({ where: { id: subcategoryId } });
+      if (!sub || sub.categoryId !== targetCategoryId) {
+        return errorResponse(res, 'The selected subcategory does not belong to the selected category.', 422);
+      }
+    }
+
+    // Resolve brand name from brandId if provided
+    let resolvedBrand = brand ? brand.trim() : undefined;
+    if (brandId) {
+      const b = await prisma.brand.findUnique({ where: { id: brandId } });
+      if (b) resolvedBrand = b.name;
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const prod = await tx.product.update({
         where: { id },
@@ -376,7 +414,8 @@ const updateProduct = async (req, res, next) => {
           ...(name && { name: name.trim() }),
           ...(shortDescription !== undefined && { shortDescription }),
           ...(description && { description }),
-          ...(brand && { brand: brand.trim() }),
+          ...(resolvedBrand && { brand: resolvedBrand }),
+          ...(brandId !== undefined && { brandId: brandId || null }),
           ...(brandingType && { brandingType }),
           ...(gender && { gender }),
           ...(productType && { productType }),
@@ -851,9 +890,24 @@ const getAdminAuditLogs = async (req, res, next) => {
  */
 const getSubCategories = async (req, res, next) => {
   try {
+    const { categoryId, search, status } = req.query;
+    const where = {};
+    if (categoryId) where.categoryId = categoryId;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (status && status !== 'ALL') where.status = status;
+
     const subCategories = await prisma.subCategory.findMany({
+      where,
       orderBy: { displayOrder: 'asc' },
-      include: { category: { select: { name: true, slug: true } } },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        _count: { select: { products: true } },
+      },
     });
     return successResponse(res, 'Subcategories retrieved', subCategories);
   } catch (error) {
@@ -863,21 +917,130 @@ const getSubCategories = async (req, res, next) => {
 
 const createSubCategory = async (req, res, next) => {
   try {
-    const { categoryId, name, slug, description } = req.body;
-    if (!categoryId || !name) {
+    const {
+      categoryId,
+      name,
+      slug,
+      description,
+      image,
+      imageAlt,
+      status = 'PUBLISHED',
+      displayOrder,
+      showOnHomepage = false,
+      seoTitle,
+      seoDescription,
+      isActive = true,
+    } = req.body;
+
+    if (!categoryId || !name || name.trim().length < 2) {
       return errorResponse(res, 'Category ID and Subcategory Name are required.', 400);
     }
-    const cleanSlug = (slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const cleanSlug = (slug || `${name}-${Date.now().toString().slice(-4)}`)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    const maxOrder = await prisma.subCategory.findFirst({
+      where: { categoryId },
+      orderBy: { displayOrder: 'desc' },
+    });
+    const orderNum = displayOrder !== undefined ? parseInt(displayOrder, 10) : (maxOrder?.displayOrder || 0) + 1;
+
     const sub = await prisma.subCategory.create({
       data: {
         categoryId,
         name: name.trim(),
         slug: cleanSlug,
-        description,
+        description: description ? description.trim() : null,
+        image: image || null,
+        imageAlt: imageAlt || name.trim(),
+        status: status || 'PUBLISHED',
+        displayOrder: orderNum,
+        showOnHomepage: Boolean(showOnHomepage),
+        seoTitle: seoTitle || null,
+        seoDescription: seoDescription || null,
+        isActive: status === 'PUBLISHED' && Boolean(isActive),
       },
+      include: { category: { select: { name: true, slug: true } } },
     });
-    await logAdminAction(req.user.id, 'SUBCATEGORY_CREATED', { subCategoryId: sub.id, name });
-    return successResponse(res, 'Subcategory created', sub, 201);
+
+    await logAdminAction(req.user.id, 'SUBCATEGORY_CREATED', { subCategoryId: sub.id, name: sub.name });
+    return successResponse(res, 'Subcategory created successfully.', sub, 201);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateSubCategory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      categoryId,
+      name,
+      slug,
+      description,
+      image,
+      imageAlt,
+      status,
+      displayOrder,
+      showOnHomepage,
+      seoTitle,
+      seoDescription,
+      isActive,
+    } = req.body;
+
+    const updateData = {};
+    if (categoryId) updateData.categoryId = categoryId;
+    if (name) {
+      updateData.name = name.trim();
+      if (slug) {
+        updateData.slug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+    }
+    if (description !== undefined) updateData.description = description ? description.trim() : null;
+    if (image !== undefined) updateData.image = image;
+    if (imageAlt !== undefined) updateData.imageAlt = imageAlt;
+    if (status !== undefined) {
+      updateData.status = status;
+      updateData.isActive = status === 'PUBLISHED';
+    }
+    if (displayOrder !== undefined) updateData.displayOrder = parseInt(displayOrder, 10);
+    if (showOnHomepage !== undefined) updateData.showOnHomepage = Boolean(showOnHomepage);
+    if (seoTitle !== undefined) updateData.seoTitle = seoTitle;
+    if (seoDescription !== undefined) updateData.seoDescription = seoDescription;
+    if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+
+    const sub = await prisma.subCategory.update({
+      where: { id },
+      data: updateData,
+      include: { category: { select: { name: true, slug: true } } },
+    });
+
+    await logAdminAction(req.user.id, 'SUBCATEGORY_UPDATED', { subCategoryId: id, name: sub.name });
+    return successResponse(res, 'Subcategory updated successfully.', sub);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const reorderSubCategories = async (req, res, next) => {
+  try {
+    const { subCategoryOrders } = req.body; // [{ id, displayOrder }]
+    if (!subCategoryOrders || !Array.isArray(subCategoryOrders)) {
+      return errorResponse(res, 'Invalid subCategoryOrders array.', 400);
+    }
+
+    await prisma.$transaction(
+      subCategoryOrders.map((item) =>
+        prisma.subCategory.update({
+          where: { id: item.id },
+          data: { displayOrder: parseInt(item.displayOrder, 10) },
+        })
+      )
+    );
+
+    await logAdminAction(req.user.id, 'SUBCATEGORIES_REORDERED', { count: subCategoryOrders.length });
+    return successResponse(res, 'Subcategories reordered successfully.');
   } catch (error) {
     next(error);
   }
@@ -886,9 +1049,21 @@ const createSubCategory = async (req, res, next) => {
 const deleteSubCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { force = false } = req.query;
+
+    const count = await prisma.product.count({ where: { subcategoryId: id } });
+    if (count > 0 && !force) {
+      return errorResponse(
+        res,
+        `Cannot delete subcategory. It is assigned to ${count} products. Please reassign products or archive this subcategory.`,
+        400,
+        { productCount: count, safeAction: 'ARCHIVE' }
+      );
+    }
+
     await prisma.subCategory.delete({ where: { id } });
     await logAdminAction(req.user.id, 'SUBCATEGORY_DELETED', { subCategoryId: id });
-    return successResponse(res, 'Subcategory deleted');
+    return successResponse(res, 'Subcategory deleted successfully.');
   } catch (error) {
     next(error);
   }
@@ -1087,25 +1262,95 @@ module.exports = {
   deleteFlashSale,
   getAdminAuditLogs,
 
-  // Categories CRUD
+  // ==========================================
+  // 12. CATEGORY MANAGEMENT
+  // ==========================================
+
+  getAdminCategories: async (req, res, next) => {
+    try {
+      const { search, status } = req.query;
+      const where = {};
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { slug: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+      if (status && status !== 'ALL') where.status = status;
+
+      const categories = await prisma.category.findMany({
+        where,
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          subCategories: {
+            orderBy: { displayOrder: 'asc' },
+            include: {
+              _count: { select: { products: true } },
+            },
+          },
+          _count: {
+            select: { products: true },
+          },
+        },
+      });
+
+      return successResponse(res, 'Admin categories loaded successfully.', categories);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   createCategory: async (req, res, next) => {
     try {
-      const { name, slug, description, image, displayOrder, isActive } = req.body;
-      if (!name) {
+      const {
+        name,
+        slug,
+        description,
+        image,
+        imageAlt,
+        status = 'PUBLISHED',
+        displayOrder,
+        showOnHomepage = true,
+        seoTitle,
+        seoDescription,
+        isActive = true,
+      } = req.body;
+
+      if (!name || name.trim().length < 2) {
         return errorResponse(res, 'Category name is required.', 400);
       }
       const cleanSlug = (slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+      // Check duplicate slug
+      const existing = await prisma.category.findFirst({
+        where: {
+          OR: [{ name: { equals: name.trim(), mode: 'insensitive' } }, { slug: cleanSlug }],
+        },
+      });
+      if (existing) {
+        return errorResponse(res, 'A category with this name or slug already exists.', 400);
+      }
+
+      const maxOrder = await prisma.category.findFirst({ orderBy: { displayOrder: 'desc' } });
+      const orderNum = displayOrder !== undefined ? parseInt(displayOrder, 10) : (maxOrder?.displayOrder || 0) + 1;
+
       const cat = await prisma.category.create({
         data: {
           name: name.trim(),
           slug: cleanSlug,
-          description,
-          image: image || 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=800',
-          displayOrder: displayOrder ? parseInt(displayOrder, 10) : 0,
-          isActive: isActive !== undefined ? Boolean(isActive) : true,
+          description: description ? description.trim() : null,
+          image: image || null,
+          imageAlt: imageAlt || name.trim(),
+          status: status || 'PUBLISHED',
+          displayOrder: orderNum,
+          showOnHomepage: Boolean(showOnHomepage),
+          seoTitle: seoTitle || null,
+          seoDescription: seoDescription || null,
+          isActive: status === 'PUBLISHED' && Boolean(isActive),
         },
       });
-      await logAdminAction(req.user.id, 'CATEGORY_CREATED', { categoryId: cat.id, name });
+
+      await logAdminAction(req.user.id, 'CATEGORY_CREATED', { categoryId: cat.id, name: cat.name });
       return successResponse(res, 'Category created successfully.', cat, 201);
     } catch (error) {
       if (error.code === 'P2002') {
@@ -1118,23 +1363,68 @@ module.exports = {
   updateCategory: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { name, slug, description, image, displayOrder, isActive } = req.body;
+      const {
+        name,
+        slug,
+        description,
+        image,
+        imageAlt,
+        status,
+        displayOrder,
+        showOnHomepage,
+        seoTitle,
+        seoDescription,
+        isActive,
+      } = req.body;
+
       const updateData = {};
       if (name) {
         updateData.name = name.trim();
         updateData.slug = (slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       }
-      if (description !== undefined) updateData.description = description;
+      if (description !== undefined) updateData.description = description ? description.trim() : null;
       if (image !== undefined) updateData.image = image;
+      if (imageAlt !== undefined) updateData.imageAlt = imageAlt;
+      if (status !== undefined) {
+        updateData.status = status;
+        updateData.isActive = status === 'PUBLISHED';
+      }
       if (displayOrder !== undefined) updateData.displayOrder = parseInt(displayOrder, 10);
+      if (showOnHomepage !== undefined) updateData.showOnHomepage = Boolean(showOnHomepage);
+      if (seoTitle !== undefined) updateData.seoTitle = seoTitle;
+      if (seoDescription !== undefined) updateData.seoDescription = seoDescription;
       if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
       const cat = await prisma.category.update({
         where: { id },
         data: updateData,
       });
-      await logAdminAction(req.user.id, 'CATEGORY_UPDATED', { categoryId: id });
+
+      await logAdminAction(req.user.id, 'CATEGORY_UPDATED', { categoryId: id, name: cat.name });
       return successResponse(res, 'Category updated successfully.', cat);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  reorderCategories: async (req, res, next) => {
+    try {
+      const { categoryOrders } = req.body; // [{ id, displayOrder }]
+      if (!categoryOrders || !Array.isArray(categoryOrders)) {
+        return errorResponse(res, 'Invalid categoryOrders array.', 400);
+      }
+
+      await prisma.$transaction(
+        categoryOrders.map((item) =>
+          prisma.category.update({
+            where: { id: item.id },
+            data: { displayOrder: parseInt(item.displayOrder, 10) },
+          })
+        )
+      );
+
+      await logAdminAction(req.user.id, 'CATEGORIES_REORDERED', { count: categoryOrders.length });
+      return successResponse(res, 'Categories reordered successfully.');
     } catch (error) {
       next(error);
     }
@@ -1143,9 +1433,234 @@ module.exports = {
   deleteCategory: async (req, res, next) => {
     try {
       const { id } = req.params;
+      const { force = false } = req.query;
+
+      const productCount = await prisma.product.count({ where: { categoryId: id } });
+      if (productCount > 0 && !force) {
+        return errorResponse(
+          res,
+          `Cannot delete category. This category is assigned to ${productCount} products. Please reassign products or archive this category instead.`,
+          400,
+          { productCount, safeAction: 'ARCHIVE' }
+        );
+      }
+
       await prisma.category.delete({ where: { id } });
       await logAdminAction(req.user.id, 'CATEGORY_DELETED', { categoryId: id });
       return successResponse(res, 'Category deleted successfully.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // ==========================================
+  // 13. BRAND MANAGEMENT (NORMAL & COMPANY BRANDING)
+  // ==========================================
+
+  getAdminBrands: async (req, res, next) => {
+    try {
+      const { search, status, brandingType } = req.query;
+      const where = {};
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { slug: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+      if (status && status !== 'ALL') where.status = status;
+      if (brandingType && brandingType !== 'ALL') where.brandingType = brandingType;
+
+      const brands = await prisma.brand.findMany({
+        where,
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          _count: { select: { products: true } },
+        },
+      });
+
+      return successResponse(res, 'Admin brands retrieved successfully.', brands);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  createBrand: async (req, res, next) => {
+    try {
+      const {
+        name,
+        slug,
+        description,
+        image,
+        imageAlt,
+        brandingType = 'NORMAL',
+        status = 'PUBLISHED',
+        displayOrder,
+        showOnHomepage = true,
+        showInSearch = true,
+        showInFilter = true,
+        seoTitle,
+        seoDescription,
+        isActive = true,
+      } = req.body;
+
+      if (!name || name.trim().length < 2) {
+        return errorResponse(res, 'Brand name is required.', 400);
+      }
+      const cleanSlug = (slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+      const existing = await prisma.brand.findFirst({
+        where: {
+          OR: [{ name: { equals: name.trim(), mode: 'insensitive' } }, { slug: cleanSlug }],
+        },
+      });
+      if (existing) {
+        return errorResponse(res, 'A brand with this name or slug already exists.', 400);
+      }
+
+      const maxOrder = await prisma.brand.findFirst({ orderBy: { displayOrder: 'desc' } });
+      const orderNum = displayOrder !== undefined ? parseInt(displayOrder, 10) : (maxOrder?.displayOrder || 0) + 1;
+
+      const brand = await prisma.brand.create({
+        data: {
+          name: name.trim(),
+          slug: cleanSlug,
+          description: description ? description.trim() : null,
+          image: image || null,
+          imageAlt: imageAlt || name.trim(),
+          brandingType: brandingType || 'NORMAL',
+          status: status || 'PUBLISHED',
+          displayOrder: orderNum,
+          showOnHomepage: Boolean(showOnHomepage),
+          showInSearch: Boolean(showInSearch),
+          showInFilter: Boolean(showInFilter),
+          seoTitle: seoTitle || null,
+          seoDescription: seoDescription || null,
+          isActive: status === 'PUBLISHED' && Boolean(isActive),
+        },
+      });
+
+      await logAdminAction(req.user.id, 'BRAND_CREATED', { brandId: brand.id, name: brand.name });
+      return successResponse(res, 'Brand created successfully.', brand, 201);
+    } catch (error) {
+      if (error.code === 'P2002') {
+        return errorResponse(res, 'A brand with this slug already exists.', 400);
+      }
+      next(error);
+    }
+  },
+
+  updateBrand: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const {
+        name,
+        slug,
+        description,
+        image,
+        imageAlt,
+        brandingType,
+        status,
+        displayOrder,
+        showOnHomepage,
+        showInSearch,
+        showInFilter,
+        seoTitle,
+        seoDescription,
+        isActive,
+      } = req.body;
+
+      const updateData = {};
+      if (name) {
+        updateData.name = name.trim();
+        updateData.slug = (slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+      if (description !== undefined) updateData.description = description ? description.trim() : null;
+      if (image !== undefined) updateData.image = image;
+      if (imageAlt !== undefined) updateData.imageAlt = imageAlt;
+      if (brandingType !== undefined) updateData.brandingType = brandingType;
+      if (status !== undefined) {
+        updateData.status = status;
+        updateData.isActive = status === 'PUBLISHED';
+      }
+      if (displayOrder !== undefined) updateData.displayOrder = parseInt(displayOrder, 10);
+      if (showOnHomepage !== undefined) updateData.showOnHomepage = Boolean(showOnHomepage);
+      if (showInSearch !== undefined) updateData.showInSearch = Boolean(showInSearch);
+      if (showInFilter !== undefined) updateData.showInFilter = Boolean(showInFilter);
+      if (seoTitle !== undefined) updateData.seoTitle = seoTitle;
+      if (seoDescription !== undefined) updateData.seoDescription = seoDescription;
+      if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+
+      const brand = await prisma.brand.update({
+        where: { id },
+        data: updateData,
+      });
+
+      await logAdminAction(req.user.id, 'BRAND_UPDATED', { brandId: id, name: brand.name });
+      return successResponse(res, 'Brand updated successfully.', brand);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  reorderBrands: async (req, res, next) => {
+    try {
+      const { brandOrders } = req.body; // [{ id, displayOrder }]
+      if (!brandOrders || !Array.isArray(brandOrders)) {
+        return errorResponse(res, 'Invalid brandOrders array.', 400);
+      }
+
+      await prisma.$transaction(
+        brandOrders.map((item) =>
+          prisma.brand.update({
+            where: { id: item.id },
+            data: { displayOrder: parseInt(item.displayOrder, 10) },
+          })
+        )
+      );
+
+      await logAdminAction(req.user.id, 'BRANDS_REORDERED', { count: brandOrders.length });
+      return successResponse(res, 'Brands reordered successfully.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  deleteBrand: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { force = false } = req.query;
+
+      const count = await prisma.product.count({ where: { brandId: id } });
+      if (count > 0 && !force) {
+        return errorResponse(
+          res,
+          `Cannot delete brand. This brand is assigned to ${count} products. Please reassign products or archive this brand.`,
+          400,
+          { productCount: count, safeAction: 'ARCHIVE' }
+        );
+      }
+
+      await prisma.brand.delete({ where: { id } });
+      await logAdminAction(req.user.id, 'BRAND_DELETED', { brandId: id });
+      return successResponse(res, 'Brand deleted successfully.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  getBrandProducts: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const products = await prisma.product.findMany({
+        where: { brandId: id },
+        include: {
+          category: { select: { name: true, slug: true } },
+          subcategory: { select: { name: true, slug: true } },
+          images: { select: { url: true, isPrimary: true }, orderBy: { sortOrder: 'asc' } },
+        },
+      });
+
+      return successResponse(res, 'Brand products retrieved successfully.', products);
     } catch (error) {
       next(error);
     }

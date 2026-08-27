@@ -61,17 +61,71 @@ export const adminService = {
     return await api.post(`/admin/customers/${id}/force-logout`);
   },
 
+  // Categories
+  getCategories: async (params = {}) => {
+    return await api.get('/admin/categories', { params });
+  },
+
+  createCategory: async (data) => {
+    return await api.post('/admin/categories', data);
+  },
+
+  updateCategory: async (id, data) => {
+    return await api.patch(`/admin/categories/${id}`, data);
+  },
+
+  deleteCategory: async (id, force = false) => {
+    return await api.delete(`/admin/categories/${id}`, { params: { force } });
+  },
+
+  reorderCategories: async (categoryOrders) => {
+    return await api.post('/admin/categories/reorder', { categoryOrders });
+  },
+
   // Subcategories
-  getSubCategories: async () => {
-    return await api.get('/admin/subcategories');
+  getSubCategories: async (params = {}) => {
+    return await api.get('/admin/subcategories', { params });
   },
 
   createSubCategory: async (data) => {
     return await api.post('/admin/subcategories', data);
   },
 
-  deleteSubCategory: async (id) => {
-    return await api.delete(`/admin/subcategories/${id}`);
+  updateSubCategory: async (id, data) => {
+    return await api.patch(`/admin/subcategories/${id}`, data);
+  },
+
+  deleteSubCategory: async (id, force = false) => {
+    return await api.delete(`/admin/subcategories/${id}`, { params: { force } });
+  },
+
+  reorderSubCategories: async (subCategoryOrders) => {
+    return await api.post('/admin/subcategories/reorder', { subCategoryOrders });
+  },
+
+  // Brands (NORMAL & COMPANY BRANDING)
+  getBrands: async (params = {}) => {
+    return await api.get('/admin/brands', { params });
+  },
+
+  createBrand: async (data) => {
+    return await api.post('/admin/brands', data);
+  },
+
+  updateBrand: async (id, data) => {
+    return await api.patch(`/admin/brands/${id}`, data);
+  },
+
+  deleteBrand: async (id, force = false) => {
+    return await api.delete(`/admin/brands/${id}`, { params: { force } });
+  },
+
+  reorderBrands: async (brandOrders) => {
+    return await api.post('/admin/brands/reorder', { brandOrders });
+  },
+
+  getBrandProducts: async (id) => {
+    return await api.get(`/admin/brands/${id}/products`);
   },
 
   // Offers & Deals

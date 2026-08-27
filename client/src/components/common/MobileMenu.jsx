@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import {
   X,
@@ -10,11 +10,34 @@ import {
   Sparkles,
   PhoneCall,
   LogOut,
+  Tag,
+  FolderTree,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import categoryService from '../../services/categoryService';
+import brandService from '../../services/brandService';
 
 const MobileMenu = ({ isOpen, onClose }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchNavData = async () => {
+      try {
+        const [catsRes, brandsRes] = await Promise.all([
+          categoryService.getCategories(),
+          brandService.getBrands({ filterOnly: true }),
+        ]);
+        if (catsRes?.data) setCategories(catsRes.data);
+        if (brandsRes?.data) setBrands(brandsRes.data);
+      } catch (err) {
+        console.error('Failed to load mobile drawer taxonomy:', err);
+      }
+    };
+    fetchNavData();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -88,10 +111,10 @@ const MobileMenu = ({ isOpen, onClose }) => {
             )}
           </div>
 
-          {/* Navigation Links */}
+          {/* Dynamic Category Navigation Links */}
           <div className="p-4 space-y-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 mb-2">
-              Collections
+              Categories
             </p>
             <NavLink
               to="/shop"
@@ -101,38 +124,61 @@ const MobileMenu = ({ isOpen, onClose }) => {
               <span>Shop All Slippers</span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </NavLink>
-            <NavLink
-              to="/shop?category=men"
-              onClick={onClose}
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
-            >
-              <span>Men's Slippers & Slides</span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </NavLink>
-            <NavLink
-              to="/shop?category=women"
-              onClick={onClose}
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
-            >
-              <span>Women's Cloud Comfort</span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </NavLink>
-            <NavLink
-              to="/shop?category=kids"
-              onClick={onClose}
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
-            >
-              <span>Kids' Play Slippers</span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </NavLink>
-            <NavLink
-              to="/shop?category=unisex"
-              onClick={onClose}
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
-            >
-              <span>Orthopedic & Wellness</span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </NavLink>
+
+            {categories.length > 0 ? (
+              categories.map((cat) => (
+                <NavLink
+                  key={cat.id}
+                  to={`/shop?category=${cat.slug}`}
+                  onClick={onClose}
+                  className="flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
+                >
+                  <span>{cat.name}</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </NavLink>
+              ))
+            ) : (
+              <>
+                <NavLink
+                  to="/shop?category=men"
+                  onClick={onClose}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
+                >
+                  <span>Men's Slippers</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </NavLink>
+                <NavLink
+                  to="/shop?category=women"
+                  onClick={onClose}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-800 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
+                >
+                  <span>Women's Slides</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </NavLink>
+              </>
+            )}
+
+            {/* Dynamic Brands in Mobile Drawer */}
+            {brands.length > 0 && (
+              <div className="pt-3 border-t border-gray-100 my-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 mb-2">
+                  Featured Brands
+                </p>
+                {brands.slice(0, 5).map((b) => (
+                  <NavLink
+                    key={b.id}
+                    to={`/brand/${b.slug}`}
+                    onClick={onClose}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-luxury-warmWhite hover:text-luxury-accent transition-colors"
+                  >
+                    <span>{b.name}</span>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {b._count?.products || 0}
+                    </span>
+                  </NavLink>
+                ))}
+              </div>
+            )}
 
             <div className="pt-4 border-t border-gray-100 my-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 mb-2">

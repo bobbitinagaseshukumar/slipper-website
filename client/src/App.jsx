@@ -16,6 +16,7 @@ import Onboarding from './pages/Onboarding';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Account from './pages/Account';
+import BrandPage from './pages/BrandPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import ShippingPolicy from './pages/ShippingPolicy';
@@ -39,6 +40,12 @@ const CategoryRedirect = () => {
   return <Navigate to={`/shop?category=${slug}`} replace />;
 };
 
+// Helper component for /category/:categorySlug/:subcategorySlug forwarding
+const CategorySubcategoryRedirect = () => {
+  const { categorySlug, subcategorySlug } = useParams();
+  return <Navigate to={`/shop?category=${categorySlug}&subcategory=${subcategorySlug}`} replace />;
+};
+
 function App() {
   const { settings } = useStoreSettings();
   const location = useLocation();
@@ -60,6 +67,10 @@ function App() {
         <Route path="/product/:slug" element={<ProductDetails />} />
         <Route path="/categories/:slug" element={<CategoryRedirect />} />
         <Route path="/category/:slug" element={<CategoryRedirect />} />
+        <Route path="/categories/:categorySlug/:subcategorySlug" element={<CategorySubcategoryRedirect />} />
+        <Route path="/category/:categorySlug/:subcategorySlug" element={<CategorySubcategoryRedirect />} />
+        <Route path="/brand/:slug" element={<BrandPage />} />
+        <Route path="/brands/:slug" element={<BrandPage />} />
 
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
