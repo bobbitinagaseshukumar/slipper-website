@@ -278,34 +278,85 @@ const getProductBySlug = async (slug) => {
     throw error;
   }
 
-  // Fetch related slippers (same category or gender, excluding current product)
-  const relatedProducts = await prisma.product.findMany({
-    where: {
-      isActive: true,
-      id: { not: product.id },
-      OR: [
-        { categoryId: product.categoryId },
-        { gender: product.gender },
-      ],
-    },
-    take: 4,
-    orderBy: [{ isFeatured: 'desc' }, { rating: 'desc' }],
-    include: {
-      category: { select: { id: true, name: true, slug: true } },
-      images: {
-        select: { id: true, url: true, altText: true, isPrimary: true },
-        take: 2,
+  // Fetch related collections in parallel
+  const [relatedProducts, brandProducts, similarProducts] = await Promise.all([
+    // 1. You May Also Like (same category or gender)
+    prisma.product.findMany({
+      where: {
+        isActive: true,
+        id: { not: product.id },
+        OR: [
+          { categoryId: product.categoryId },
+          { gender: product.gender },
+        ],
       },
-      variants: {
-        where: { isActive: true },
-        select: { size: true, colorName: true, colorCode: true },
+      take: 4,
+      orderBy: [{ isFeatured: 'desc' }, { rating: 'desc' }],
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        images: {
+          select: { id: true, url: true, altText: true, isPrimary: true },
+          take: 2,
+        },
+        variants: {
+          where: { isActive: true },
+          select: { size: true, colorName: true, colorCode: true },
+        },
       },
-    },
-  });
+    }),
+
+    // 2. More From This Brand
+    product.brand || product.brandId
+      ? prisma.product.findMany({
+          where: {
+            isActive: true,
+            id: { not: product.id },
+            OR: [
+              ...(product.brandId ? [{ brandId: product.brandId }] : []),
+              ...(product.brand ? [{ brand: { equals: product.brand, mode: 'insensitive' } }] : []),
+            ],
+          },
+          take: 4,
+          orderBy: [{ createdAt: 'desc' }],
+          include: {
+            category: { select: { id: true, name: true, slug: true } },
+            images: {
+              select: { id: true, url: true, altText: true, isPrimary: true },
+              take: 2,
+            },
+          },
+        })
+      : Promise.resolve([]),
+
+    // 3. Similar Comfort / Product Type Slippers
+    product.productType || product.subcategoryId
+      ? prisma.product.findMany({
+          where: {
+            isActive: true,
+            id: { not: product.id },
+            OR: [
+              ...(product.subcategoryId ? [{ subcategoryId: product.subcategoryId }] : []),
+              ...(product.productType ? [{ productType: { equals: product.productType, mode: 'insensitive' } }] : []),
+            ],
+          },
+          take: 4,
+          orderBy: [{ rating: 'desc' }],
+          include: {
+            category: { select: { id: true, name: true, slug: true } },
+            images: {
+              select: { id: true, url: true, altText: true, isPrimary: true },
+              take: 2,
+            },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
 
   return {
     ...product,
     relatedProducts,
+    brandProducts,
+    similarProducts,
   };
 };
 
@@ -491,9 +542,100 @@ const getFilterOptions = async () => {
   };
 };
 
+/**
+ * Record Product View (LIFO, updates timestamp and keeps clean state)
+ */
+const recordProductView = async (productId, userId, ipAddress) => {
+  if (!productId) return null;
+
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, isActive: true },
+    });
+    if (!product || !product.isActive) return null;
+
+    if (userId) {
+      // Remove previous view records for this user and product to prevent duplicate items
+      await prisma.productView.deleteMany({
+        where: { userId, productId },
+      });
+
+      return await prisma.productView.create({
+        data: {
+          productId,
+          userId,
+          ipAddress: ipAddress || null,
+        },
+      });
+    } else if (ipAddress) {
+      return await prisma.productView.create({
+        data: {
+          productId,
+          ipAddress,
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Failed to record product view:', err.message);
+  }
+  return null;
+};
+
+/**
+ * Get Recently Viewed Products for authenticated User
+ */
+const getRecentlyViewed = async (userId) => {
+  if (!userId) return [];
+
+  try {
+    const views = await prisma.productView.findMany({
+      where: {
+        userId,
+        product: { isActive: true },
+      },
+      orderBy: { viewedAt: 'desc' },
+      distinct: ['productId'],
+      take: 12,
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            price: true,
+            originalPrice: true,
+            discountPercentage: true,
+            rating: true,
+            reviewCount: true,
+            stock: true,
+            brand: true,
+            category: { select: { id: true, name: true, slug: true } },
+            images: {
+              where: { isPrimary: true },
+              select: { url: true, altText: true },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    return views.map((v) => ({
+      ...v.product,
+      viewedAt: v.viewedAt,
+    }));
+  } catch (err) {
+    console.error('Failed to load recently viewed products:', err.message);
+    return [];
+  }
+};
+
 module.exports = {
   getProducts,
   getProductBySlug,
   getSuggestions,
   getFilterOptions,
+  recordProductView,
+  getRecentlyViewed,
 };

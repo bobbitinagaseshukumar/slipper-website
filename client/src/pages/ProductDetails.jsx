@@ -93,7 +93,13 @@ const ProductDetails = () => {
           setSelectedSize(prod.variants[0].size);
         }
 
-        // Track in Recently Viewed (LIFO, max 4)
+        // Record product view in database & local storage
+        try {
+          productService.recordProductView(prod.id);
+        } catch (e) {
+          // Non-blocking
+        }
+
         const storedViews = JSON.parse(localStorage.getItem('aurasole_recent_views') || '[]');
         const filtered = storedViews.filter((item) => item.id !== prod.id);
         const updatedRecent = [
@@ -108,10 +114,10 @@ const ProductDetails = () => {
             category: prod.category,
           },
           ...filtered,
-        ].slice(0, 4);
+        ].slice(0, 6);
 
         localStorage.setItem('aurasole_recent_views', JSON.stringify(updatedRecent));
-        setRecentlyViewed(filtered.slice(0, 4));
+        setRecentlyViewed(filtered.slice(0, 6));
       }
     } catch (err) {
       console.error('Failed to load slipper details:', err);
@@ -644,6 +650,62 @@ const ProductDetails = () => {
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                 {product.relatedProducts.map((rel) => (
+                  <ProductCard key={rel.id} product={rel} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* More From This Brand */}
+          {product.brandProducts && product.brandProducts.length > 0 && (
+            <div className="space-y-6 pt-6 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-luxury-accent">
+                    {product.brand || 'Brand'} Showcase
+                  </span>
+                  <h3 className="font-display font-black text-xl sm:text-2xl text-luxury-dark mt-1">
+                    More From {product.brand || 'This Brand'}
+                  </h3>
+                </div>
+                <Link
+                  to={`/shop?brand=${encodeURIComponent(product.brand || '')}`}
+                  className="text-xs font-bold text-luxury-dark hover:text-luxury-accent flex items-center gap-1"
+                >
+                  View Brand <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                {product.brandProducts.map((rel) => (
+                  <ProductCard key={rel.id} product={rel} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Similar Styles */}
+          {product.similarProducts && product.similarProducts.length > 0 && (
+            <div className="space-y-6 pt-6 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-luxury-accent">
+                    Curated For You
+                  </span>
+                  <h3 className="font-display font-black text-xl sm:text-2xl text-luxury-dark mt-1">
+                    Similar Slipper Styles
+                  </h3>
+                </div>
+                <Link
+                  to="/shop"
+                  className="text-xs font-bold text-luxury-dark hover:text-luxury-accent flex items-center gap-1"
+                >
+                  Shop All <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                {product.similarProducts.map((rel) => (
                   <ProductCard key={rel.id} product={rel} />
                 ))}
               </div>

@@ -16,6 +16,14 @@ export const productService = {
   getFilterOptions: async () => {
     return await api.get('/products/filters');
   },
+
+  recordProductView: async (productId) => {
+    return await api.post(`/products/${productId}/view`);
+  },
+
+  getRecentlyViewed: async () => {
+    return await api.get('/products/user/recently-viewed');
+  },
 };
 
 export default productService;

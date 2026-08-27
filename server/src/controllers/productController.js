@@ -49,9 +49,39 @@ const getFilterOptions = async (req, res, next) => {
   }
 };
 
+/**
+ * Record Product View
+ */
+const recordView = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id || null;
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    await productService.recordProductView(id, userId, ipAddress);
+    return successResponse(res, 'View recorded');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get Recently Viewed Products for User
+ */
+const getRecentlyViewed = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const products = await productService.getRecentlyViewed(userId);
+    return successResponse(res, 'Recently viewed products loaded', products);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProducts,
   getProductBySlug,
   getSuggestions,
   getFilterOptions,
+  recordView,
+  getRecentlyViewed,
 };
