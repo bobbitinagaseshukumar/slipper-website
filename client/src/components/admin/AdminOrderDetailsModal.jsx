@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   User,
   CreditCard,
+  Trash2,
 } from 'lucide-react';
 import adminService from '../../services/adminService';
 
@@ -31,6 +32,8 @@ const AdminOrderDetailsModal = ({
 }) => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [cancelReason, setCancelReason] = useState('Cancelled by admin request.');
   const [shippingCourier, setShippingCourier] = useState('Delhivery');
   const [shippingTracking, setShippingTracking] = useState('');
@@ -38,6 +41,23 @@ const AdminOrderDetailsModal = ({
   const [errorMsg, setErrorMsg] = useState(null);
 
   if (!isOpen || !order) return null;
+
+  const handleDeleteOrder = async () => {
+    setIsDeleting(true);
+    setErrorMsg(null);
+    try {
+      await adminService.deleteOrder(order.id);
+      if (showToast) {
+        showToast('success', `Order #${order.orderNumber} permanently deleted.`);
+      }
+      if (onOrderUpdated) onOrderUpdated();
+      onClose();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to delete order.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleUpdateStatus = async (newStatus, extraData = {}) => {
     setErrorMsg(null);
@@ -384,7 +404,47 @@ const AdminOrderDetailsModal = ({
               Cancel Order
             </button>
           )}
+
+          {/* 6. PERMANENT DELETE ORDER (ADMIN PRIVILEGE) */}
+          {!isConfirmingDelete && (
+            <button
+              type="button"
+              onClick={() => setIsConfirmingDelete(true)}
+              className="p-2.5 bg-stone-950 hover:bg-rose-950 text-stone-500 hover:text-rose-400 border border-stone-800 rounded-2xl transition-colors ml-auto"
+              title="Permanently Delete Order"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
+
+        {/* Delete Order Confirmation Subform */}
+        {isConfirmingDelete && (
+          <div className="p-4 rounded-2xl bg-rose-950/80 border border-rose-800 space-y-3 animate-in fade-in text-xs">
+            <div className="flex items-center gap-2 text-rose-300 font-bold">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Are you sure you want to permanently delete order #{order.orderNumber}? This action cannot be undone.</span>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setIsConfirmingDelete(false)}
+                className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-xl font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteOrder}
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
+              >
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>{isDeleting ? 'Deleting...' : 'Delete Permanently'}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Shipping Prompt Subform */}
         {isShippingPrompt && (

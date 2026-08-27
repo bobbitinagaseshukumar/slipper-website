@@ -44,6 +44,7 @@ router.get('/orders', adminController.getAdminOrders);
 router.get('/orders/:id', adminController.getAdminOrderDetails);
 router.post('/orders/:id/approve', adminController.approveOrder);
 router.patch('/orders/:id/status', adminController.updateOrderStatus);
+router.delete('/orders/:id', adminController.deleteOrder);
 
 // Admin Notifications Center
 router.get('/notifications', adminController.getAdminNotifications);

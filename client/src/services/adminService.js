@@ -52,6 +52,10 @@ export const adminService = {
     return await api.patch(`/admin/orders/${id}/status`, data);
   },
 
+  deleteOrder: async (id) => {
+    return await api.delete(`/admin/orders/${id}`);
+  },
+
   // Admin Notification Center
   getAdminNotifications: async (params = {}) => {
     return await api.get('/admin/notifications', { params });

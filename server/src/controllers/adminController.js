@@ -45,57 +45,93 @@ const getDashboardStats = async (req, res, next) => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
     const [
       totalOrders,
       todayOrders,
       pendingOrders,
+      approvedOrders,
+      processingOrders,
+      shippedOrders,
       deliveredOrders,
       cancelledOrders,
       completedOrdersForRevenue,
       totalCustomers,
+      activeCustomers,
+      blockedCustomers,
       totalProducts,
+      publishedProducts,
+      draftProducts,
       lowStockVariants,
       outOfStockVariants,
       recentOrders,
+      pendingReviewsCount,
+      totalReviewsCount,
+      topOrderItems,
     ] = await Promise.all([
       prisma.order.count(),
       prisma.order.count({ where: { createdAt: { gte: todayStart } } }),
       prisma.order.count({
-        where: { status: { in: ['PENDING', 'CONFIRMED', 'PROCESSING', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY'] } },
+        where: { status: { in: ['PENDING', 'WHATSAPP_PENDING'] } },
+      }),
+      prisma.order.count({
+        where: { status: { in: ['APPROVED', 'CONFIRMED'] } },
+      }),
+      prisma.order.count({
+        where: { status: { in: ['PROCESSING', 'PACKED'] } },
+      }),
+      prisma.order.count({
+        where: { status: { in: ['SHIPPED', 'OUT_FOR_DELIVERY'] } },
       }),
       prisma.order.count({ where: { status: 'DELIVERED' } }),
-      prisma.order.count({ where: { status: 'CANCELLED' } }),
+      prisma.order.count({ where: { status: { in: ['CANCELLED', 'REJECTED', 'REFUNDED'] } } }),
       // Non-cancelled orders for gross revenue
       prisma.order.findMany({
-        where: { status: { not: 'CANCELLED' } },
+        where: { status: { notIn: ['CANCELLED', 'REJECTED', 'REFUNDED'] } },
         select: { finalAmount: true, createdAt: true },
       }),
       prisma.user.count({ where: { role: 'CUSTOMER' } }),
+      prisma.user.count({ where: { role: 'CUSTOMER', status: 'ACTIVE', isBlocked: false } }),
+      prisma.user.count({ where: { role: 'CUSTOMER', OR: [{ status: 'BLOCKED' }, { isBlocked: true }] } }),
+      prisma.product.count(),
       prisma.product.count({ where: { isActive: true } }),
+      prisma.product.count({ where: { isActive: false } }),
       prisma.productVariant.findMany({
         where: { stock: { gt: 0, lte: 5 } },
         include: { product: { select: { name: true, slug: true } } },
-        take: 5,
+        take: 8,
       }),
       prisma.productVariant.findMany({
         where: { stock: 0 },
         include: { product: { select: { name: true, slug: true } } },
-        take: 5,
+        take: 8,
       }),
       prisma.order.findMany({
-        take: 6,
+        take: 8,
         orderBy: { createdAt: 'desc' },
         include: {
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, email: true, phone: true } },
           _count: { select: { items: true } },
         },
       }),
+      prisma.review.count({ where: { isApproved: false } }),
+      prisma.review.count({ where: { isApproved: true } }),
+      prisma.orderItem.groupBy({
+        by: ['productId', 'productName'],
+        _sum: { quantity: true, totalPrice: true },
+        orderBy: { _sum: { quantity: 'desc' } },
+        take: 5,
+      }),
     ]);
 
-    // Calculate Total Revenue and Today's Revenue
+    // Calculate Total, Today's, and This Month's Revenue
     const totalRevenue = completedOrdersForRevenue.reduce((sum, o) => sum + o.finalAmount, 0);
     const todayRevenue = completedOrdersForRevenue
       .filter((o) => new Date(o.createdAt) >= todayStart)
+      .reduce((sum, o) => sum + o.finalAmount, 0);
+    const thisMonthRevenue = completedOrdersForRevenue
+      .filter((o) => new Date(o.createdAt) >= monthStart)
       .reduce((sum, o) => sum + o.finalAmount, 0);
 
     // Build Daily Sales Trend data points for the selected range
@@ -124,16 +160,32 @@ const getDashboardStats = async (req, res, next) => {
       metrics: {
         totalRevenue: Math.round(totalRevenue),
         todayRevenue: Math.round(todayRevenue),
+        thisMonthRevenue: Math.round(thisMonthRevenue),
         totalOrders,
         todayOrders,
         pendingOrders,
+        approvedOrders,
+        processingOrders,
+        shippedOrders,
         deliveredOrders,
         cancelledOrders,
         totalCustomers,
+        activeCustomers,
+        blockedCustomers,
         totalProducts,
+        publishedProducts,
+        draftProducts,
         lowStockCount: lowStockVariants.length,
         outOfStockCount: outOfStockVariants.length,
+        pendingReviewsCount,
+        totalReviewsCount,
       },
+      topProducts: topOrderItems.map((item) => ({
+        productId: item.productId,
+        name: item.productName,
+        totalUnitsSold: item._sum.quantity || 0,
+        totalRevenue: item._sum.totalPrice || 0,
+      })),
       chartData,
       lowStockVariants,
       outOfStockVariants,
@@ -924,6 +976,31 @@ const updateOrderStatus = async (req, res, next) => {
     });
 
     return successResponse(res, `Order #${order.orderNumber} updated to ${status}`, updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findFirst({
+      where: { OR: [{ id }, { orderNumber: id }] },
+      select: { id: true, orderNumber: true },
+    });
+
+    if (!order) return errorResponse(res, 'Order not found.', 404);
+
+    await prisma.order.delete({
+      where: { id: order.id },
+    });
+
+    await logAdminAction(req.user.id, 'ORDER_DELETED', {
+      orderNumber: order.orderNumber,
+      orderId: order.id,
+    });
+
+    return successResponse(res, `Order #${order.orderNumber} permanently deleted.`);
   } catch (error) {
     next(error);
   }
@@ -1882,11 +1959,21 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getAdminOrders,
+  getAdminOrderDetails,
+  approveOrder,
   updateOrderStatus,
+  deleteOrder,
+  getAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
   getAdminCustomers,
+  getAdminCustomerDetails,
   updateCustomerStatus,
-  deleteCustomer,
+  updateCustomerAdminNotes,
   forceLogoutCustomer,
+  forcePasswordResetCustomer,
+  softDeleteCustomer,
+  deleteCustomer,
   getAdminReviews,
   moderateReview,
   getAdminCoupons,
@@ -1898,7 +1985,9 @@ module.exports = {
   reorderBanners,
   getSubCategories,
   createSubCategory,
+  updateSubCategory,
   deleteSubCategory,
+  reorderSubCategories,
   getOffers,
   createOffer,
   deleteOffer,

@@ -677,20 +677,43 @@ const AdminPortal = () => {
 
               {/* KPI Matrix Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {/* 1. Total Revenue Card */}
+                <div
+                  className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-luxury-accent/50 transition-all space-y-2 group"
+                >
+                  <div className="flex items-center justify-between text-stone-400 text-xs">
+                    <span>Total Gross Revenue</span>
+                    <DollarSign className="w-4 h-4 text-luxury-accent group-hover:scale-110 transition-transform" />
+                  </div>
+                  <div className="font-display font-black text-2xl text-luxury-accent">
+                    ₹{stats?.metrics?.totalRevenue?.toLocaleString('en-IN') ?? stats?.totalRevenue ?? 0}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-emerald-400 font-bold">Today: ₹{stats?.metrics?.todayRevenue?.toLocaleString('en-IN') ?? 0}</span>
+                    <span className="text-stone-500 font-mono">Month: ₹{stats?.metrics?.thisMonthRevenue?.toLocaleString('en-IN') ?? 0}</span>
+                  </div>
+                </div>
+
+                {/* 2. Total Orders Card */}
                 <div
                   onClick={() => setActiveTab('orders')}
                   className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-luxury-accent/50 cursor-pointer transition-all space-y-2 group"
                 >
                   <div className="flex items-center justify-between text-stone-400 text-xs">
-                    <span>Total Orders</span>
+                    <span>Total Slipper Orders</span>
                     <ShoppingBag className="w-4 h-4 text-luxury-accent group-hover:scale-110 transition-transform" />
                   </div>
                   <div className="font-display font-black text-2xl text-white">
-                    {stats?.totalOrders ?? (isLoadingStats ? '...' : 0)}
+                    {stats?.metrics?.totalOrders ?? stats?.totalOrders ?? 0}
                   </div>
-                  <span className="text-[10px] text-emerald-400 font-bold">+12% from last cycle</span>
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="text-amber-400 font-bold">{stats?.metrics?.pendingOrders ?? 0} Pending</span>
+                    <span className="text-stone-500">•</span>
+                    <span className="text-emerald-400 font-bold">{stats?.metrics?.deliveredOrders ?? 0} Delivered</span>
+                  </div>
                 </div>
 
+                {/* 3. Customers Card */}
                 <div
                   onClick={() => setActiveTab('customers')}
                   className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-luxury-accent/50 cursor-pointer transition-all space-y-2 group"
@@ -700,39 +723,48 @@ const AdminPortal = () => {
                     <Users className="w-4 h-4 text-luxury-accent group-hover:scale-110 transition-transform" />
                   </div>
                   <div className="font-display font-black text-2xl text-white">
-                    {stats?.totalCustomers ?? (isLoadingStats ? '...' : 0)}
+                    {stats?.metrics?.totalCustomers ?? stats?.totalCustomers ?? 0}
                   </div>
-                  <span className="text-[10px] text-emerald-400 font-bold">VIP Slipper Members</span>
+                  <span className="text-[10px] text-emerald-400 font-bold">
+                    {stats?.metrics?.activeCustomers ?? stats?.totalCustomers ?? 0} Active • {stats?.metrics?.blockedCustomers ?? 0} Blocked
+                  </span>
                 </div>
 
+                {/* 4. Products Card */}
                 <div
                   onClick={() => setActiveTab('products')}
                   className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-luxury-accent/50 cursor-pointer transition-all space-y-2 group"
                 >
                   <div className="flex items-center justify-between text-stone-400 text-xs">
-                    <span>Active Products</span>
+                    <span>Slipper Catalog</span>
                     <Package className="w-4 h-4 text-luxury-accent group-hover:scale-110 transition-transform" />
                   </div>
                   <div className="font-display font-black text-2xl text-white">
-                    {stats?.totalProducts ?? (isLoadingStats ? '...' : 0)}
+                    {stats?.metrics?.totalProducts ?? stats?.totalProducts ?? 0}
                   </div>
-                  <span className="text-[10px] text-stone-400 font-bold">{categories.length} Categories Live</span>
+                  <span className="text-[10px] text-stone-400 font-bold">
+                    {stats?.metrics?.publishedProducts ?? stats?.totalProducts ?? 0} Live • {stats?.metrics?.draftProducts ?? 0} Draft
+                  </span>
                 </div>
 
+                {/* 5. Inventory Stock Card */}
                 <div
                   onClick={() => setActiveTab('inventory')}
                   className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-luxury-accent/50 cursor-pointer transition-all space-y-2 group"
                 >
                   <div className="flex items-center justify-between text-stone-400 text-xs">
-                    <span>Low Stock Alert</span>
+                    <span>Low Stock / Out of Stock</span>
                     <Archive className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
                   </div>
                   <div className="font-display font-black text-2xl text-rose-400">
-                    {stats?.lowStockCount ?? (isLoadingStats ? '...' : 0)}
+                    {stats?.metrics?.lowStockCount ?? stats?.lowStockCount ?? 0}
                   </div>
-                  <span className="text-[10px] text-rose-400 font-bold">Needs restock</span>
+                  <span className="text-[10px] text-rose-400 font-bold">
+                    {stats?.metrics?.outOfStockCount ?? 0} sizes completely out of stock
+                  </span>
                 </div>
 
+                {/* 6. WhatsApp Orders */}
                 <div
                   onClick={() => setActiveTab('whatsapp_orders')}
                   className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-emerald-500/50 cursor-pointer transition-all space-y-2 group"
@@ -747,32 +779,22 @@ const AdminPortal = () => {
                   <span className="text-[10px] text-emerald-400 font-bold">Direct Showroom Chat</span>
                 </div>
 
+                {/* 7. Razorpay Paid */}
                 <div
                   onClick={() => setActiveTab('payments')}
                   className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-blue-500/50 cursor-pointer transition-all space-y-2 group"
                 >
                   <div className="flex items-center justify-between text-stone-400 text-xs">
-                    <span>Razorpay Paid</span>
+                    <span>Online Paid (Razorpay)</span>
                     <CreditCard className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
                   </div>
                   <div className="font-display font-black text-2xl text-blue-400">
                     {orders.filter((o) => o.paymentMethod === 'RAZORPAY').length}
                   </div>
-                  <span className="text-[10px] text-blue-400 font-bold">Instant Online Settlement</span>
+                  <span className="text-[10px] text-blue-400 font-bold">Verified Settlements</span>
                 </div>
 
-                <div
-                  onClick={() => setActiveTab('coupons')}
-                  className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-luxury-accent/50 cursor-pointer transition-all space-y-2 group"
-                >
-                  <div className="flex items-center justify-between text-stone-400 text-xs">
-                    <span>Active Coupons</span>
-                    <Tag className="w-4 h-4 text-luxury-accent group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="font-display font-black text-2xl text-white">{coupons.length}</div>
-                  <span className="text-[10px] text-luxury-accent font-bold">Promotional codes</span>
-                </div>
-
+                {/* 8. Customer Reviews & Moderation */}
                 <div
                   onClick={() => setActiveTab('reviews')}
                   className="p-5 rounded-3xl bg-stone-900 border border-stone-800/80 hover:border-amber-400/50 cursor-pointer transition-all space-y-2 group"
@@ -781,8 +803,12 @@ const AdminPortal = () => {
                     <span>Customer Reviews</span>
                     <Star className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
                   </div>
-                  <div className="font-display font-black text-2xl text-amber-400">{reviews.length}</div>
-                  <span className="text-[10px] text-amber-400 font-bold">4.9/5.0 Store Average</span>
+                  <div className="font-display font-black text-2xl text-amber-400">
+                    {reviews.length}
+                  </div>
+                  <span className="text-[10px] text-amber-400 font-bold">
+                    {stats?.metrics?.pendingReviewsCount ?? 0} Pending Moderation
+                  </span>
                 </div>
               </div>
 
