@@ -216,6 +216,76 @@ const Home = () => {
           </section>
         )}
 
+        {/* 5. Women's Curated Stories */}
+        {collections.women && collections.women.length > 0 && (
+          <section className="py-16 bg-gradient-to-b from-white to-brand-50/30">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <RevealOnScroll direction="up">
+                <div className="flex justify-between items-end mb-8">
+                  <div>
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-pink-500">
+                      Women's Edition
+                    </span>
+                    <h2 className="font-display font-black text-2xl sm:text-3xl text-luxury-dark mt-1">
+                      Women's Style & Comfort
+                    </h2>
+                  </div>
+                  <Link
+                    to="/shop?category=women"
+                    className="text-xs sm:text-sm font-bold text-luxury-dark hover:text-pink-500 flex items-center gap-1 transition-colors group"
+                  >
+                    <span>Shop Women</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
+              </RevealOnScroll>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                {collections.women.map((product, idx) => (
+                  <RevealOnScroll key={product.id} delay={idx * 80} direction="up">
+                    <ProductCard product={product} />
+                  </RevealOnScroll>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 6. Kids' Curated Stories */}
+        {collections.kids && collections.kids.length > 0 && (
+          <section className="py-16 bg-luxury-warmWhite">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <RevealOnScroll direction="up">
+                <div className="flex justify-between items-end mb-8">
+                  <div>
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-500">
+                      Kids' Edition
+                    </span>
+                    <h2 className="font-display font-black text-2xl sm:text-3xl text-luxury-dark mt-1">
+                      Fun & Comfy Kids' Slippers
+                    </h2>
+                  </div>
+                  <Link
+                    to="/shop?category=kids"
+                    className="text-xs sm:text-sm font-bold text-luxury-dark hover:text-emerald-500 flex items-center gap-1 transition-colors group"
+                  >
+                    <span>Shop Kids</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
+              </RevealOnScroll>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                {collections.kids.map((product, idx) => (
+                  <RevealOnScroll key={product.id} delay={idx * 80} direction="up">
+                    <ProductCard product={product} />
+                  </RevealOnScroll>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Why Choose Us Biomechanics Section */}
         <WhyChooseUs />
 
