@@ -74,33 +74,33 @@ const FlashSaleBanner = () => {
                 <Clock className="w-4 h-4" /> Deal Ends In
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 max-w-full justify-center">
                 {/* Hours */}
                 <div className="flex flex-col items-center">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center font-display font-black text-2xl sm:text-3xl text-white shadow-inner">
+                  <div className="w-13 h-13 sm:w-20 sm:h-20 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center font-display font-black text-lg sm:text-3xl text-white shadow-inner">
                     {formatNumber(timeLeft.hours)}
                   </div>
-                  <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Hours</span>
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mt-1">Hours</span>
                 </div>
 
-                <span className="font-black text-2xl text-luxury-accent mb-4">:</span>
+                <span className="font-black text-xl sm:text-2xl text-luxury-accent mb-4">:</span>
 
                 {/* Minutes */}
                 <div className="flex flex-col items-center">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center font-display font-black text-2xl sm:text-3xl text-white shadow-inner">
+                  <div className="w-13 h-13 sm:w-20 sm:h-20 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center font-display font-black text-lg sm:text-3xl text-white shadow-inner">
                     {formatNumber(timeLeft.minutes)}
                   </div>
-                  <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Mins</span>
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mt-1">Mins</span>
                 </div>
 
-                <span className="font-black text-2xl text-luxury-accent mb-4">:</span>
+                <span className="font-black text-xl sm:text-2xl text-luxury-accent mb-4">:</span>
 
                 {/* Seconds */}
                 <div className="flex flex-col items-center">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center font-display font-black text-2xl sm:text-3xl text-luxury-gold shadow-inner">
+                  <div className="w-13 h-13 sm:w-20 sm:h-20 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center font-display font-black text-lg sm:text-3xl text-luxury-gold shadow-inner">
                     {formatNumber(timeLeft.seconds)}
                   </div>
-                  <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">Secs</span>
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-gray-400 mt-1">Secs</span>
                 </div>
               </div>
             </div>

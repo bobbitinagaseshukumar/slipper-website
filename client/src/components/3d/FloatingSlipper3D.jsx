@@ -108,19 +108,35 @@ const FloatingSlipper3D = ({
           }}
           className="relative max-w-xs sm:max-w-sm lg:max-w-md transform-gpu"
         >
-          {/* Main Slipper Image with AnimatePresence Color Crossfade */}
+          {/* Main Slipper Image/Video with AnimatePresence Color Crossfade */}
           <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white/70 bg-gradient-to-b from-stone-100 to-stone-200">
             <AnimatePresence mode="wait">
-              <motion.img
-                key={imageUrl}
-                src={imageUrl}
-                alt={title}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1.05 }}
-                exit={{ opacity: 0, scale: 1.05 }}
-                transition={{ duration: 0.45, ease: 'easeOut' }}
-                className="w-full h-64 sm:h-72 lg:h-80 object-cover select-none pointer-events-none"
-              />
+              {imageUrl && (imageUrl.endsWith('.mp4') || imageUrl.endsWith('.webm') || imageUrl.includes('video')) ? (
+                <motion.video
+                  key={imageUrl}
+                  src={imageUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1.05 }}
+                  exit={{ opacity: 0, scale: 1.05 }}
+                  transition={{ duration: 0.45, ease: 'easeOut' }}
+                  className="w-full h-64 sm:h-72 lg:h-80 object-cover select-none pointer-events-none"
+                />
+              ) : (
+                <motion.img
+                  key={imageUrl}
+                  src={imageUrl}
+                  alt={title}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1.05 }}
+                  exit={{ opacity: 0, scale: 1.05 }}
+                  transition={{ duration: 0.45, ease: 'easeOut' }}
+                  className="w-full h-64 sm:h-72 lg:h-80 object-cover select-none pointer-events-none"
+                />
+              )}
             </AnimatePresence>
             <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
           </div>
@@ -128,25 +144,25 @@ const FloatingSlipper3D = ({
           {/* Floating Pill Info Badge (Bottom Left) */}
           <div
             style={{ transform: 'translateZ(48px)' }}
-            className="absolute -bottom-4 -left-4 sm:-left-6 px-4 py-2.5 rounded-2xl bg-luxury-dark/95 text-white backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-3 z-30"
+            className="absolute -bottom-3 left-1 sm:-bottom-4 sm:-left-6 px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-2xl bg-luxury-dark/95 text-white backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-2 sm:gap-3 z-30"
           >
-            <div className="w-8 h-8 rounded-xl bg-luxury-accent text-luxury-dark flex items-center justify-center font-bold text-xs shadow-sm">
-              <ShieldCheck className="w-4 h-4" />
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-xl bg-luxury-accent text-luxury-dark flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
             <div>
-              <p className="text-[10px] text-gray-400 font-medium">Anatomical Arch</p>
-              <p className="text-xs font-bold text-white">100% Shock Relief</p>
+              <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium">Anatomical Arch</p>
+              <p className="text-[11px] sm:text-xs font-bold text-white">100% Relief</p>
             </div>
           </div>
 
           {/* Floating Pill Price Badge (Bottom Right) */}
           <div
             style={{ transform: 'translateZ(48px)' }}
-            className="absolute -bottom-4 -right-4 sm:-right-6 px-4 py-2.5 rounded-2xl bg-white/95 text-luxury-dark backdrop-blur-xl border border-luxury-accent/30 shadow-2xl flex items-center gap-2 z-30"
+            className="absolute -bottom-3 right-1 sm:-bottom-4 sm:-right-6 px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-2xl bg-white/95 text-luxury-dark backdrop-blur-xl border border-luxury-accent/30 shadow-2xl flex items-center gap-2 z-30"
           >
             <div>
-              <p className="text-[10px] text-gray-400 font-semibold uppercase">Intro Price</p>
-              <p className="text-sm font-black text-luxury-dark">{price}</p>
+              <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase">Intro Price</p>
+              <p className="text-xs sm:text-sm font-black text-luxury-dark">{price}</p>
             </div>
           </div>
         </motion.div>

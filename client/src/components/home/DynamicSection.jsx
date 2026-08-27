@@ -104,18 +104,29 @@ const DynamicSection = ({ section }) => {
         {/* Section Promotional Banner (If provided) */}
         {section.bannerImage && (
           <RevealOnScroll direction="up">
-            <div className="w-full h-44 sm:h-64 rounded-3xl overflow-hidden shadow-lg border border-stone-200 relative group">
-              <img
-                src={section.bannerImage}
-                alt={section.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-6">
+            <div className="w-full aspect-[16/9] sm:aspect-[21/9] lg:aspect-[3/1] rounded-3xl overflow-hidden shadow-lg border border-stone-200 relative group">
+              {section.bannerImage.endsWith('.mp4') || section.bannerImage.endsWith('.webm') || section.bannerImage.includes('video') ? (
+                <video
+                  src={section.bannerImage}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                />
+              ) : (
+                <img
+                  src={section.bannerImage}
+                  alt={section.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4 sm:p-6">
                 <div className="text-white">
                   <span className="text-[10px] font-mono uppercase tracking-widest text-luxury-accent font-bold">
                     Special Showcase
                   </span>
-                  <h3 className="font-display font-black text-xl sm:text-2xl">{section.title}</h3>
+                  <h3 className="font-display font-black text-lg sm:text-2xl">{section.title}</h3>
                 </div>
               </div>
             </div>
