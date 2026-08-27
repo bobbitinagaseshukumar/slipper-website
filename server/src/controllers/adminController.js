@@ -3,6 +3,7 @@ const prisma = require('../config/db');
 const emailService = require('../services/emailService');
 const sessionService = require('../services/sessionService');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
+const { invalidateHomepageCache } = require('./homepageController');
 
 /**
  * Helper to record Admin Audit Activity
@@ -366,7 +367,9 @@ const createProduct = async (req, res, next) => {
           isNewArrival: Boolean(isNewArrival),
           isBestSeller: Boolean(isBestSeller),
           isActive: status === 'PUBLISHED' || Boolean(isActive),
-          stock: variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0) || 20,
+          stock: variants.length > 0
+            ? variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0)
+            : (parseInt(req.body.stock, 10) || 0),
         },
       });
 
@@ -413,6 +416,7 @@ const createProduct = async (req, res, next) => {
       return created;
     });
 
+    invalidateHomepageCache();
     await logAdminAction(req.user.id, 'PRODUCT_CREATED', { productId: product.id, name: product.name });
 
     return successResponse(res, 'Product created successfully', product, 201);
@@ -571,6 +575,7 @@ const updateProduct = async (req, res, next) => {
       return prod;
     });
 
+    invalidateHomepageCache();
     await logAdminAction(req.user.id, 'PRODUCT_UPDATED', { productId: id, name: updated.name });
 
     return successResponse(res, 'Product updated successfully', updated);
@@ -591,6 +596,7 @@ const deleteProduct = async (req, res, next) => {
       data: { isActive: false },
     });
 
+    invalidateHomepageCache();
     await logAdminAction(req.user.id, 'PRODUCT_ARCHIVED', { productId: id, name: existing.name });
 
     return successResponse(res, 'Product archived successfully');
@@ -2104,6 +2110,7 @@ module.exports = {
         },
       });
 
+      invalidateHomepageCache();
       await logAdminAction(req.user.id, 'CATEGORY_CREATED', { categoryId: cat.id, name: cat.name });
       return successResponse(res, 'Category created successfully.', cat, 201);
     } catch (error) {
@@ -2154,6 +2161,7 @@ module.exports = {
         data: updateData,
       });
 
+      invalidateHomepageCache();
       await logAdminAction(req.user.id, 'CATEGORY_UPDATED', { categoryId: id, name: cat.name });
       return successResponse(res, 'Category updated successfully.', cat);
     } catch (error) {
@@ -2177,6 +2185,7 @@ module.exports = {
         )
       );
 
+      invalidateHomepageCache();
       await logAdminAction(req.user.id, 'CATEGORIES_REORDERED', { count: categoryOrders.length });
       return successResponse(res, 'Categories reordered successfully.');
     } catch (error) {
@@ -2200,6 +2209,7 @@ module.exports = {
       }
 
       await prisma.category.delete({ where: { id } });
+      invalidateHomepageCache();
       await logAdminAction(req.user.id, 'CATEGORY_DELETED', { categoryId: id });
       return successResponse(res, 'Category deleted successfully.');
     } catch (error) {
