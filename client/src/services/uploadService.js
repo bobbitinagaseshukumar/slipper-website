@@ -6,7 +6,7 @@ export const uploadService = {
    */
   async getStatus() {
     const response = await api.get('/upload/status');
-    return response.data;
+    return response;
   },
 
   /**
@@ -24,7 +24,7 @@ export const uploadService = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
+    return response;
   },
 
   /**
@@ -44,7 +44,7 @@ export const uploadService = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
+    return response;
   },
 
   /**
@@ -56,7 +56,7 @@ export const uploadService = {
     const response = await api.delete('/upload/image', {
       data: { url, publicId },
     });
-    return response.data;
+    return response;
   },
 };
 

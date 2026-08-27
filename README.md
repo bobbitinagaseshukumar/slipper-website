@@ -87,12 +87,8 @@ npm run dev
 
 ## 🔐 Credentials & Admin Initialization
 
-- **Customer Demo Account**:
-  - Email: `customer@aurasole.com`
-  - Password: `Password@123`
-- **Super Administrator Account**:
-  - Email: `admin@aurasole.com`
-  - Password: `Admin@2026Secure`
+- **Admin Login**: Use the email and password configured in your environment/seed.
+- **Customer Login**: Use the email and password configured in your environment/seed.
 
 ---
 

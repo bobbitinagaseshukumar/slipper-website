@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const prisma = require('../config/db');
 const emailService = require('./emailService');
 
-const OTP_SECRET = process.env.OTP_SECRET || 'aurasole_slipper_otp_secure_salt_2026';
+const OTP_SECRET = process.env.OTP_SECRET;
 const OTP_EXPIRY_MINUTES = 5;
 const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_SECONDS = 30;

@@ -261,7 +261,7 @@ const createOrder = async (req, res, next) => {
         totalAmount: finalAmount,
       },
       req.user
-    );
+    ).catch(err => console.error('Email dispatch failed:', err.message));
 
     return successResponse(res, 'Order placed successfully!', {
       orderNumber: createdOrder.orderNumber,
@@ -502,7 +502,7 @@ const cancelOrder = async (req, res, next) => {
     });
 
     // Trigger Asynchronous Order Cancellation Email
-    emailService.sendOrderCancelledEmail(order, req.user, reason);
+    emailService.sendOrderCancelledEmail(order, req.user, reason).catch(err => console.error('Email dispatch failed:', err.message));
 
     return successResponse(res, 'Order cancelled successfully');
   } catch (error) {
@@ -874,7 +874,7 @@ const createWhatsAppOrder = async (req, res, next) => {
           totalAmount: finalAmount,
         },
         { name: effectiveCustomerName, email: effectiveEmail }
-      );
+      ).catch(err => console.error('Email dispatch failed:', err.message));
     }
 
     return successResponse(res, 'WhatsApp order created successfully', {

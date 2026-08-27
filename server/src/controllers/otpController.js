@@ -4,7 +4,8 @@ const prisma = require('../config/db');
 const otpService = require('../services/otpService');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_slipper_store_luxury_2026_secure';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('FATAL: JWT_SECRET environment variable is required');
 const JWT_EXPIRES_IN = '7d';
 
 /**
@@ -126,11 +127,8 @@ const sendAdminLoginOTP = async (req, res, next) => {
     }
 
     // Verify Password
-    if (admin.passwordHash) {
-      const isMatch = await bcrypt.compare(password, admin.passwordHash);
-      if (!isMatch) {
-        return errorResponse(res, 'Invalid administrator credentials.', 401);
-      }
+    if (!admin.passwordHash || !(await bcrypt.compare(password, admin.passwordHash))) {
+      return errorResponse(res, 'Invalid administrator credentials.', 401);
     }
 
     // Dispatch mandatory Admin OTP

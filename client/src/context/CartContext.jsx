@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import cartService from '../services/cartService';
 import { useAuth } from './AuthContext';
 
@@ -17,12 +17,23 @@ export const CartProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
-  // Sync cart when auth state changes
+  // Sync cart when auth state changes — merge guest cart on login
   useEffect(() => {
     const fetchCart = async () => {
       if (isAuthenticated) {
         try {
           setIsLoading(true);
+          // Merge guest cart items on login
+          const guestCartRaw = localStorage.getItem('aurasole_guest_cart');
+          if (guestCartRaw) {
+            try {
+              const guestCart = JSON.parse(guestCartRaw);
+              if (guestCart.items && guestCart.items.length > 0) {
+                await cartService.mergeCart(guestCart.items).catch(() => {});
+              }
+            } catch (e) { /* ignore parse error */ }
+            localStorage.removeItem('aurasole_guest_cart');
+          }
           const res = await cartService.getCart();
           if (res?.data) {
             setCart(res.data);
@@ -49,15 +60,19 @@ export const CartProvider = ({ children }) => {
     fetchCart();
   }, [isAuthenticated]);
 
-  const addToCart = async (itemData) => {
+  const addToCart = useCallback(async (itemData) => {
     if (isAuthenticated) {
-      const res = await cartService.addToCart(itemData);
-      // Refresh cart
-      const updatedCart = await cartService.getCart();
-      if (updatedCart?.data) {
-        setCart(updatedCart.data);
+      try {
+        const res = await cartService.addToCart(itemData);
+        const updatedCart = await cartService.getCart();
+        if (updatedCart?.data) {
+          setCart(updatedCart.data);
+        }
+        return res;
+      } catch (error) {
+        console.error('Failed to add to cart:', error);
+        throw error;
       }
-      return res;
     } else {
       // Guest Cart Management
       const prevItems = cart.items || [];
@@ -115,14 +130,19 @@ export const CartProvider = ({ children }) => {
       localStorage.setItem('aurasole_guest_cart', JSON.stringify(updatedGuestCart));
       return { success: true, message: 'Added to your bag' };
     }
-  };
+  }, [isAuthenticated, cart.items]);
 
-  const updateQuantity = async (itemId, quantity) => {
+  const updateQuantity = useCallback(async (itemId, quantity) => {
     if (isAuthenticated) {
-      await cartService.updateQuantity(itemId, quantity);
-      const updatedCart = await cartService.getCart();
-      if (updatedCart?.data) {
-        setCart(updatedCart.data);
+      try {
+        await cartService.updateQuantity(itemId, quantity);
+        const updatedCart = await cartService.getCart();
+        if (updatedCart?.data) {
+          setCart(updatedCart.data);
+        }
+      } catch (error) {
+        console.error('Failed to update cart quantity:', error);
+        throw error;
       }
     } else {
       const newItems = cart.items
@@ -158,14 +178,19 @@ export const CartProvider = ({ children }) => {
       setCart(updated);
       localStorage.setItem('aurasole_guest_cart', JSON.stringify(updated));
     }
-  };
+  }, [isAuthenticated, cart.items]);
 
-  const removeItem = async (itemId) => {
+  const removeItem = useCallback(async (itemId) => {
     if (isAuthenticated) {
-      await cartService.removeItem(itemId);
-      const updatedCart = await cartService.getCart();
-      if (updatedCart?.data) {
-        setCart(updatedCart.data);
+      try {
+        await cartService.removeItem(itemId);
+        const updatedCart = await cartService.getCart();
+        if (updatedCart?.data) {
+          setCart(updatedCart.data);
+        }
+      } catch (error) {
+        console.error('Failed to remove cart item:', error);
+        throw error;
       }
     } else {
       const newItems = cart.items.filter((item) => item.id !== itemId);
@@ -189,9 +214,9 @@ export const CartProvider = ({ children }) => {
       setCart(updated);
       localStorage.setItem('aurasole_guest_cart', JSON.stringify(updated));
     }
-  };
+  }, [isAuthenticated, cart.items]);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart({
       items: [],
       itemCount: 0,
@@ -201,9 +226,9 @@ export const CartProvider = ({ children }) => {
       freeDeliveryEligible: false,
     });
     localStorage.removeItem('aurasole_guest_cart');
-  };
+  }, []);
 
-  const refreshCart = async () => {
+  const refreshCart = useCallback(async () => {
     if (isAuthenticated) {
       try {
         const res = await cartService.getCart();
@@ -214,9 +239,10 @@ export const CartProvider = ({ children }) => {
         console.warn('Failed to refresh cart:', e);
       }
     }
-  };
+  }, [isAuthenticated]);
 
-  const value = {
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     cart,
     itemCount: cart.itemCount || 0,
     subtotal: cart.subtotal || 0,
@@ -231,7 +257,7 @@ export const CartProvider = ({ children }) => {
     clearCart,
     refreshCart,
     fetchCart: refreshCart,
-  };
+  }), [cart, isLoading, isCartDrawerOpen, addToCart, updateQuantity, removeItem, clearCart, refreshCart]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };

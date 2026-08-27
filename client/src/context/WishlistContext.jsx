@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import wishlistService from '../services/wishlistService';
 import { useAuth } from './AuthContext';
 
@@ -39,12 +39,12 @@ export const WishlistProvider = ({ children }) => {
     fetchWishlist();
   }, [isAuthenticated]);
 
-  const isWishlisted = (productId) => {
+  const isWishlisted = useCallback((productId) => {
     return wishlist.some((item) => item.id === productId);
-  };
+  }, [wishlist]);
 
-  const toggleWishlist = async (product) => {
-    if (!product || !product.id) return;
+  const toggleWishlist = useCallback(async (product) => {
+    if (!product || !product.id) return false;
 
     if (isAuthenticated) {
       try {
@@ -59,10 +59,11 @@ export const WishlistProvider = ({ children }) => {
         return isNowSaved;
       } catch (err) {
         console.error('Wishlist toggle error:', err);
+        return false;
       }
     } else {
       // Guest Wishlist management
-      const exists = isWishlisted(product.id);
+      const exists = wishlist.some((p) => p.id === product.id);
       let updated;
       if (exists) {
         updated = wishlist.filter((p) => p.id !== product.id);
@@ -73,27 +74,32 @@ export const WishlistProvider = ({ children }) => {
       localStorage.setItem('aurasole_guest_wishlist', JSON.stringify(updated));
       return !exists;
     }
-  };
+  }, [isAuthenticated, wishlist]);
 
-  const removeFromWishlist = async (productId) => {
+  const removeFromWishlist = useCallback(async (productId) => {
     if (isAuthenticated) {
-      await wishlistService.toggleWishlist(productId);
-      setWishlist((prev) => prev.filter((p) => p.id !== productId));
+      try {
+        await wishlistService.toggleWishlist(productId);
+        setWishlist((prev) => prev.filter((p) => p.id !== productId));
+      } catch (err) {
+        console.error('Failed to remove from wishlist:', err);
+      }
     } else {
       const updated = wishlist.filter((p) => p.id !== productId);
       setWishlist(updated);
       localStorage.setItem('aurasole_guest_wishlist', JSON.stringify(updated));
     }
-  };
+  }, [isAuthenticated, wishlist]);
 
-  const value = {
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     wishlist,
     wishlistCount: wishlist.length,
     isLoading,
     isWishlisted,
     toggleWishlist,
     removeFromWishlist,
-  };
+  }), [wishlist, isLoading, isWishlisted, toggleWishlist, removeFromWishlist]);
 
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>;
 };

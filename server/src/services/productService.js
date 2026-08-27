@@ -10,6 +10,8 @@ const getProducts = async (queryParams = {}) => {
     q,
     category,
     subcategory,
+    brand,
+    brandingType,
     gender,
     size,
     color,

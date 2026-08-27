@@ -56,7 +56,10 @@ const getDashboardStats = async (req, res, next) => {
       shippedOrders,
       deliveredOrders,
       cancelledOrders,
-      completedOrdersForRevenue,
+      totalRevenueAgg,
+      todayRevenueAgg,
+      monthRevenueAgg,
+      dailyChartRaw,
       totalCustomers,
       activeCustomers,
       blockedCustomers,
@@ -86,11 +89,28 @@ const getDashboardStats = async (req, res, next) => {
       }),
       prisma.order.count({ where: { status: 'DELIVERED' } }),
       prisma.order.count({ where: { status: { in: ['CANCELLED', 'REJECTED', 'REFUNDED'] } } }),
-      // Non-cancelled orders for gross revenue
-      prisma.order.findMany({
+      // Revenue aggregations (database-level, not in-memory)
+      prisma.order.aggregate({
         where: { status: { notIn: ['CANCELLED', 'REJECTED', 'REFUNDED'] } },
-        select: { finalAmount: true, createdAt: true },
+        _sum: { finalAmount: true },
       }),
+      prisma.order.aggregate({
+        where: { status: { notIn: ['CANCELLED', 'REJECTED', 'REFUNDED'] }, createdAt: { gte: todayStart } },
+        _sum: { finalAmount: true },
+      }),
+      prisma.order.aggregate({
+        where: { status: { notIn: ['CANCELLED', 'REJECTED', 'REFUNDED'] }, createdAt: { gte: monthStart } },
+        _sum: { finalAmount: true },
+      }),
+      // Daily chart data via groupBy
+      prisma.$queryRaw`
+        SELECT DATE(\"createdAt\") as day, COUNT(*)::int as orders, COALESCE(SUM(\"finalAmount\"), 0)::float as revenue
+        FROM "Order"
+        WHERE "status" NOT IN ('CANCELLED', 'REJECTED', 'REFUNDED')
+          AND "createdAt" >= ${startDate}
+        GROUP BY DATE("createdAt")
+        ORDER BY day ASC
+      `,
       prisma.user.count({ where: { role: 'CUSTOMER' } }),
       prisma.user.count({ where: { role: 'CUSTOMER', status: 'ACTIVE', isBlocked: false } }),
       prisma.user.count({ where: { role: 'CUSTOMER', OR: [{ status: 'BLOCKED' }, { isBlocked: true }] } }),
@@ -125,34 +145,31 @@ const getDashboardStats = async (req, res, next) => {
       }),
     ]);
 
-    // Calculate Total, Today's, and This Month's Revenue
-    const totalRevenue = completedOrdersForRevenue.reduce((sum, o) => sum + o.finalAmount, 0);
-    const todayRevenue = completedOrdersForRevenue
-      .filter((o) => new Date(o.createdAt) >= todayStart)
-      .reduce((sum, o) => sum + o.finalAmount, 0);
-    const thisMonthRevenue = completedOrdersForRevenue
-      .filter((o) => new Date(o.createdAt) >= monthStart)
-      .reduce((sum, o) => sum + o.finalAmount, 0);
+    // Revenue from database aggregations (no in-memory processing)
+    const totalRevenue = totalRevenueAgg._sum.finalAmount || 0;
+    const todayRevenue = todayRevenueAgg._sum.finalAmount || 0;
+    const thisMonthRevenue = monthRevenueAgg._sum.finalAmount || 0;
 
-    // Build Daily Sales Trend data points for the selected range
+    // Build Daily Sales Trend from raw SQL groupBy results
     const daysCount = range === '7d' ? 7 : range === 'today' ? 1 : 14;
     const chartData = [];
+    const rawMap = new Map();
+    if (Array.isArray(dailyChartRaw)) {
+      dailyChartRaw.forEach((row) => {
+        const key = new Date(row.day).toDateString();
+        rawMap.set(key, { revenue: Math.round(row.revenue), orders: Number(row.orders) });
+      });
+    }
 
     for (let i = daysCount - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dayKey = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-
-      const dayOrders = completedOrdersForRevenue.filter((o) => {
-        const orderDate = new Date(o.createdAt);
-        return orderDate.toDateString() === d.toDateString();
-      });
-
-      const dayRevenue = dayOrders.reduce((sum, o) => sum + o.finalAmount, 0);
+      const entry = rawMap.get(d.toDateString()) || { revenue: 0, orders: 0 };
       chartData.push({
         date: dayKey,
-        revenue: Math.round(dayRevenue),
-        orders: dayOrders.length,
+        revenue: entry.revenue,
+        orders: entry.orders,
       });
     }
 
@@ -833,7 +850,7 @@ const approveOrder = async (req, res, next) => {
     });
 
     if (order.user) {
-      emailService.sendOrderConfirmedEmail(updated, order.user);
+      emailService.sendOrderConfirmedEmail(updated, order.user).catch(err => console.error('Email dispatch failed:', err.message));
     }
 
     await logAdminAction(req.user.id, 'ORDER_APPROVED', {
@@ -961,11 +978,11 @@ const updateOrderStatus = async (req, res, next) => {
     // 5. Trigger Asynchronous Transactional Emails
     if (order.user) {
       if (status === 'SHIPPED') {
-        emailService.sendOrderShippedEmail(updated, order.user, trackingNumber);
+        emailService.sendOrderShippedEmail(updated, order.user, trackingNumber).catch(err => console.error('Email dispatch failed:', err.message));
       } else if (status === 'DELIVERED') {
-        emailService.sendOrderDeliveredEmail(updated, order.user);
+        emailService.sendOrderDeliveredEmail(updated, order.user).catch(err => console.error('Email dispatch failed:', err.message));
       } else if (status === 'CANCELLED') {
-        emailService.sendOrderCancelledEmail(updated, order.user, cancellationReason || 'Cancelled by store administrator.');
+        emailService.sendOrderCancelledEmail(updated, order.user, cancellationReason || 'Cancelled by store administrator.').catch(err => console.error('Email dispatch failed:', err.message));
       }
     }
 

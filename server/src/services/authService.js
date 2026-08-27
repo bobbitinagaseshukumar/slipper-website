@@ -6,7 +6,7 @@ const sessionService = require('./sessionService');
 const emailService = require('./emailService');
 const storeSettingsService = require('./storeSettingsService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_slipper_store_luxury_2026_secure';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 
 const generateToken = (userId, role, sessionToken = '', sessionId = '') => {

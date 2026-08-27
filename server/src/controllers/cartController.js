@@ -47,9 +47,11 @@ const getCart = async (req, res, next) => {
     if (!cart) {
       cart = await prisma.cart.create({
         data: { userId: req.user.id },
-        include: { items: [] },
+        include: { items: true },
       });
     }
+
+    cart.items = cart.items || [];
 
     // Calculate subtotal and item count
     let subtotal = 0;

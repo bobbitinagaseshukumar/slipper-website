@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import authService from '../services/authService';
 import {
   signInWithGoogle,
@@ -25,10 +25,15 @@ export const AuthProvider = ({ children }) => {
             setUser(response.data);
           }
         } catch (error) {
-          console.warn('Session expired or invalid, logging out silently.');
-          localStorage.removeItem('aurasole_token');
-          setToken(null);
-          setUser(null);
+          // Only clear token on 401 (expired/invalid), NOT on network errors
+          if (error?.status === 401 || error?.response?.status === 401) {
+            console.warn('Session expired or invalid, logging out silently.');
+            localStorage.removeItem('aurasole_token');
+            setToken(null);
+            setUser(null);
+          } else {
+            console.warn('Network error during auth check, keeping session:', error?.message);
+          }
         }
       }
       setIsLoading(false);
@@ -37,7 +42,7 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const response = await authService.login({ email, password });
     if (response?.data?.token) {
       localStorage.setItem('aurasole_token', response.data.token);
@@ -49,9 +54,9 @@ export const AuthProvider = ({ children }) => {
       });
     }
     return response;
-  };
+  }, []);
 
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     const response = await authService.register(userData);
     if (response?.data?.token) {
       localStorage.setItem('aurasole_token', response.data.token);
@@ -63,12 +68,12 @@ export const AuthProvider = ({ children }) => {
       });
     }
     return response;
-  };
+  }, []);
 
   /**
    * Google OAuth Login via Firebase
    */
-  const loginGoogle = async () => {
+  const loginGoogle = useCallback(async () => {
     const fbUser = await signInWithGoogle();
     const syncRes = await authService.firebaseSync({
       firebaseUid: fbUser.uid,
@@ -90,12 +95,12 @@ export const AuthProvider = ({ children }) => {
       });
     }
     return syncRes.data;
-  };
+  }, []);
 
   /**
    * Facebook OAuth Login via Firebase
    */
-  const loginFacebook = async () => {
+  const loginFacebook = useCallback(async () => {
     const fbUser = await signInWithFacebook();
     const syncRes = await authService.firebaseSync({
       firebaseUid: fbUser.uid,
@@ -117,12 +122,12 @@ export const AuthProvider = ({ children }) => {
       });
     }
     return syncRes.data;
-  };
+  }, []);
 
   /**
    * Complete Customer Onboarding Flow
    */
-  const submitOnboarding = async (onboardingData) => {
+  const submitOnboarding = useCallback(async (onboardingData) => {
     const response = await authService.completeOnboarding(onboardingData);
     if (response?.data) {
       setUser(response.data);
@@ -132,9 +137,9 @@ export const AuthProvider = ({ children }) => {
       });
     }
     return response;
-  };
+  }, []);
 
-  const updateProfile = async (profileData) => {
+  const updateProfile = useCallback(async (profileData) => {
     const response = await authService.updateProfile(profileData);
     if (response?.data) {
       setUser(response.data);
@@ -144,9 +149,9 @@ export const AuthProvider = ({ children }) => {
       });
     }
     return response;
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await authService.logout();
       await logoutFirebase().catch(() => {});
@@ -159,22 +164,23 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setAuthNotification(null);
     }
-  };
+  }, []);
 
-  const updateUser = (updatedData) => {
+  const updateUser = useCallback((updatedData) => {
     setUser((prev) => ({ ...prev, ...updatedData }));
-  };
+  }, []);
 
-  const clearNotification = () => setAuthNotification(null);
+  const clearNotification = useCallback(() => setAuthNotification(null), []);
 
-  const loginWithToken = (newToken, userData) => {
+  const loginWithToken = useCallback((newToken, userData) => {
     localStorage.setItem('aurasole_token', newToken);
     localStorage.setItem('adminToken', newToken);
     setToken(newToken);
     if (userData) setUser(userData);
-  };
+  }, []);
 
-  const value = {
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     user,
     token,
     isAuthenticated: !!user,
@@ -191,7 +197,7 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     logout,
     updateUser,
-  };
+  }), [user, token, isLoading, authNotification, clearNotification, login, loginWithToken, register, loginGoogle, loginFacebook, submitOnboarding, updateProfile, logout, updateUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

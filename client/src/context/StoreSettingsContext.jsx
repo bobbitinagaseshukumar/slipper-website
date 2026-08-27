@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
 
 const DEFAULT_SETTINGS = {
@@ -157,23 +157,29 @@ export const StoreSettingsProvider = ({ children }) => {
   }, [settings.metaTitle, settings.storeName, settings.tagline, settings.favicon]);
 
   // Admin Update Action
-  const updateSettings = async (newSettings) => {
-    const res = await api.put('/settings/admin', newSettings);
-    if (res?.data) {
-      setSettings((prev) => ({ ...prev, ...res.data }));
+  const updateSettings = useCallback(async (newSettings) => {
+    try {
+      const res = await api.put('/settings/admin', newSettings);
+      if (res?.data) {
+        setSettings((prev) => ({ ...prev, ...res.data }));
+      }
+      return res;
+    } catch (err) {
+      console.error('Failed to update settings:', err);
+      throw err;
     }
-    return res;
-  };
+  }, []);
+
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    settings,
+    isLoading,
+    refreshSettings: fetchSettings,
+    updateSettings,
+  }), [settings, isLoading, fetchSettings, updateSettings]);
 
   return (
-    <StoreSettingsContext.Provider
-      value={{
-        settings,
-        isLoading,
-        refreshSettings: fetchSettings,
-        updateSettings,
-      }}
-    >
+    <StoreSettingsContext.Provider value={contextValue}>
       {children}
     </StoreSettingsContext.Provider>
   );

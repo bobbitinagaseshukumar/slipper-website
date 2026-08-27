@@ -3,7 +3,7 @@ const prisma = require('../config/db');
 const sessionService = require('../services/sessionService');
 const { errorResponse } = require('../utils/responseHandler');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_slipper_store_luxury_2026_secure';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Authenticate JWT token & Validate Session with Strict 4-Day Inactivity Window

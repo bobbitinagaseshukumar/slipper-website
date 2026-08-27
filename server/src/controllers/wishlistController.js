@@ -38,9 +38,11 @@ const getWishlist = async (req, res, next) => {
     if (!wishlist) {
       wishlist = await prisma.wishlist.create({
         data: { userId: req.user.id },
-        include: { items: [] },
+        include: { items: { include: { product: { select: { id: true, name: true, slug: true, price: true, originalPrice: true, discountPercentage: true, rating: true, stock: true, brand: true, images: { where: { isPrimary: true }, select: { url: true, altText: true }, take: 1 } } } } } },
       });
     }
+
+    wishlist.items = wishlist.items || [];
 
     const products = wishlist.items.map((item) => item.product);
 

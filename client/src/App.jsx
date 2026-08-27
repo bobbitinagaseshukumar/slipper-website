@@ -1,34 +1,36 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
-import Home from './pages/Home';
-import Shop from './pages/Shop';
-import ProductDetails from './pages/ProductDetails';
-import About from './pages/About';
-import Contact from './pages/Contact';
-import SearchPage from './pages/SearchPage';
-import Cart from './pages/Cart';
-import Wishlist from './pages/Wishlist';
-import Checkout from './pages/Checkout';
-import OrderSuccess from './pages/OrderSuccess';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Onboarding from './pages/Onboarding';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Account from './pages/Account';
-import BrandPage from './pages/BrandPage';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import Terms from './pages/Terms';
-import ShippingPolicy from './pages/ShippingPolicy';
-import ReturnPolicy from './pages/ReturnPolicy';
-import Unsubscribe from './pages/Unsubscribe';
-import OTPVerification from './pages/OTPVerification';
-import NotFound from './pages/NotFound';
+
+// Lazy-load all route pages for code splitting
+const Home = lazy(() => import('./pages/Home'));
+const Shop = lazy(() => import('./pages/Shop'));
+const ProductDetails = lazy(() => import('./pages/ProductDetails'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Wishlist = lazy(() => import('./pages/Wishlist'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Account = lazy(() => import('./pages/Account'));
+const BrandPage = lazy(() => import('./pages/BrandPage'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const ShippingPolicy = lazy(() => import('./pages/ShippingPolicy'));
+const ReturnPolicy = lazy(() => import('./pages/ReturnPolicy'));
+const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
+const OTPVerification = lazy(() => import('./pages/OTPVerification'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 import ProtectedRoute from './routes/ProtectedRoute';
 import AdminRoute from './routes/AdminRoute';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminPortal from './pages/admin/AdminPortal';
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const AdminPortal = lazy(() => import('./pages/admin/AdminPortal'));
 
 import { useStoreSettings } from './context/StoreSettingsContext';
 import GlobalPromotionPopup from './components/common/GlobalPromotionPopup';
@@ -58,7 +60,8 @@ function App() {
   return (
     <>
       <GlobalPromotionPopup />
-      <Routes>
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>}>
+        <Routes>
         {/* Public Storefront Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />
@@ -161,6 +164,7 @@ function App() {
         {/* Fallback 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
     </>
   );
 }

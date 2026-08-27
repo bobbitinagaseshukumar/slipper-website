@@ -8,9 +8,9 @@ async function main() {
 
   // 1. Create Default Users (Admin & Customer)
   const salt = await bcrypt.genSalt(10);
-  const newAdminPassword = await bcrypt.hash('seshu@2409slippers', salt);
-  const legacyAdminPassword = await bcrypt.hash('Admin@12345', salt);
-  const customerPassword = await bcrypt.hash('Customer@12345', salt);
+  const newAdminPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD || 'ChangeMe!Str0ng@2026', salt);
+  const legacyAdminPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD || 'ChangeMe!Str0ng@2026', salt);
+  const customerPassword = await bcrypt.hash(process.env.SEED_CUSTOMER_PASSWORD || 'Customer!Str0ng@2026', salt);
 
   const admin1 = await prisma.user.upsert({
     where: { email: 'nagaseshukumarbobbiti@gmail.com' },
@@ -85,7 +85,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Users seeded (Super Admin: nagaseshukumatbobbiti@gmail.com / seshu@2409slippers)');
+  console.log('✅ Users seeded (use SEED_ADMIN_PASSWORD env var to set password)');
 
   // 2. Create Site Settings
   const settings = [

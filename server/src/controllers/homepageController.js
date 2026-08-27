@@ -1,11 +1,26 @@
 const prisma = require('../config/db');
 const { successResponse } = require('../utils/responseHandler');
 
+// Simple in-memory cache for homepage data (5-minute TTL)
+let homepageCache = null;
+let homepageCacheExpiry = 0;
+const HOMEPAGE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Call this to invalidate cache when admin updates homepage content
+const invalidateHomepageCache = () => {
+  homepageCache = null;
+  homepageCacheExpiry = 0;
+};
+
 /**
  * Consolidated Homepage Data API
  */
 const getHomepageData = async (req, res, next) => {
   try {
+    if (homepageCache && Date.now() < homepageCacheExpiry) {
+      return successResponse(res, 'Homepage loaded (cached)', homepageCache);
+    }
+
     const now = new Date();
 
     const [
@@ -229,7 +244,7 @@ const getHomepageData = async (req, res, next) => {
       return acc;
     }, {});
 
-    return successResponse(res, 'Homepage data loaded successfully', {
+    const responseData = {
       banners,
       categories,
       brands,
@@ -255,7 +270,12 @@ const getHomepageData = async (req, res, next) => {
         logo: storeSettingsRecord?.logo || null,
         maintenanceMode: storeSettingsRecord?.maintenanceMode || false,
       },
-    });
+    };
+
+    homepageCache = responseData;
+    homepageCacheExpiry = Date.now() + HOMEPAGE_CACHE_TTL;
+
+    return successResponse(res, 'Homepage data loaded successfully', responseData);
   } catch (error) {
     next(error);
   }
@@ -263,4 +283,5 @@ const getHomepageData = async (req, res, next) => {
 
 module.exports = {
   getHomepageData,
+  invalidateHomepageCache,
 };
