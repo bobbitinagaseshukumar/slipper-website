@@ -21,6 +21,7 @@ router.post('/quick-product-whatsapp', optionalAuth, orderLimiter, orderControll
 // Authenticated Customer Order Endpoints
 router.use(authenticateUser);
 
+router.get('/user/stats', orderController.getUserOrderStats);
 router.get('/', orderController.getUserOrders);
 router.get('/:orderNumber', orderController.getOrderByNumber);
 router.post('/', orderLimiter, orderController.createOrder);

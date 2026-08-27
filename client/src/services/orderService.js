@@ -29,6 +29,10 @@ export const orderService = {
     return await api.post(`/orders/${orderNumber}/return`, data);
   },
 
+  getUserOrderStats: async () => {
+    return await api.get('/orders/user/stats');
+  },
+
   reorder: async (orderNumber) => {
     return await api.post(`/orders/${orderNumber}/reorder`);
   },

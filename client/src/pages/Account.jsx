@@ -66,6 +66,8 @@ import AccountSidebar from '../components/account/AccountSidebar';
 import OrderDetailsModal from '../components/account/OrderDetailsModal';
 import AddressModal from '../components/checkout/AddressModal';
 import WriteReviewModal from '../components/reviews/WriteReviewModal';
+import ImageCropModal from '../components/admin/ImageCropModal';
+import authService from '../services/authService';
 
 const Account = () => {
   const { user, updateUser, logout } = useAuth();
@@ -97,11 +99,30 @@ const Account = () => {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [addressToEdit, setAddressToEdit] = useState(null);
 
-  // Profile Edit State
+  // Profile Edit State & Cropper
   const [profileForm, setProfileForm] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
     profileImage: user?.profileImage || '',
+  });
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [cropModalFile, setCropModalFile] = useState(null);
+  const [customFieldsConfig, setCustomFieldsConfig] = useState([]);
+  const [customFieldsValues, setCustomFieldsValues] = useState(() => {
+    try {
+      return typeof user?.customFields === 'string' ? JSON.parse(user.customFields) : (user?.customFields || {});
+    } catch {
+      return {};
+    }
+  });
+  const [orderCounts, setOrderCounts] = useState({
+    ALL: 0,
+    PENDING: 0,
+    APPROVED: 0,
+    PROCESSING: 0,
+    SHIPPED: 0,
+    DELIVERED: 0,
+    CANCELLED: 0,
   });
   const [profileMsg, setProfileMsg] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -173,7 +194,7 @@ const Account = () => {
     }
   };
 
-  // Load Orders
+  // Load Orders with status counts
   const loadOrders = async (page = 1) => {
     try {
       setIsLoadingOrders(true);
@@ -185,6 +206,9 @@ const Account = () => {
       if (res?.data) {
         setOrders(res.data.orders);
         setOrderPagination(res.data.pagination);
+        if (res.data.counts) {
+          setOrderCounts(res.data.counts);
+        }
 
         // If URL contains orderNumber, auto-select it
         if (orderNumber) {
@@ -196,6 +220,18 @@ const Account = () => {
       console.error('Failed to load orders:', err);
     } finally {
       setIsLoadingOrders(false);
+    }
+  };
+
+  // Load Custom Registration Fields Config
+  const loadCustomFieldsConfig = async () => {
+    try {
+      const res = await authService.getAuthSettings();
+      if (res?.data?.customFields) {
+        setCustomFieldsConfig(res.data.customFields.filter((f) => f.isActive));
+      }
+    } catch (err) {
+      console.error('Failed to load custom fields config:', err);
     }
   };
 
@@ -258,6 +294,7 @@ const Account = () => {
     loadCoupons();
     loadUserReviews();
     loadRecentViews();
+    loadCustomFieldsConfig();
   }, []);
 
   useEffect(() => {
@@ -352,34 +389,56 @@ const Account = () => {
     }
   };
 
-  // Profile Image Base64 Handler
+  // Profile Image File Picker & Square Crop Modal Trigger
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileMsg({ type: 'error', text: 'Image file size must be less than 2MB.' });
+    if (file.size > 10 * 1024 * 1024) {
+      setProfileMsg({ type: 'error', text: 'Image file size must be less than 10MB.' });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfileForm((prev) => ({ ...prev, profileImage: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    setCropModalFile(file);
+    setIsCropModalOpen(true);
   };
 
-  // Save Profile Details
+  // Crop Complete - Instant Cloudinary / Server Upload & Profile Avatar Update
+  const handleCropComplete = async (uploadedUrl) => {
+    setIsCropModalOpen(false);
+    setCropModalFile(null);
+    setProfileForm((prev) => ({ ...prev, profileImage: uploadedUrl }));
+
+    try {
+      const res = await userService.updateProfile({
+        name: profileForm.name,
+        phone: profileForm.phone,
+        profileImage: uploadedUrl,
+        customFields: customFieldsValues,
+      });
+      if (res?.data) {
+        updateUser(res.data);
+        setProfileMsg({ type: 'success', text: 'Profile photo updated and saved successfully!' });
+      }
+    } catch (err) {
+      setProfileMsg({ type: 'error', text: err.message || 'Failed to update profile photo.' });
+    }
+  };
+
+  // Save Profile Details & Dynamic Custom Fields
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setProfileMsg(null);
     setIsSavingProfile(true);
 
     try {
-      const res = await userService.updateProfile(profileForm);
+      const res = await userService.updateProfile({
+        ...profileForm,
+        customFields: customFieldsValues,
+      });
       if (res?.data) {
         updateUser(res.data);
-        setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
+        setProfileMsg({ type: 'success', text: 'Profile details saved successfully!' });
       }
     } catch (err) {
       setProfileMsg({ type: 'error', text: err.message || 'Failed to update profile.' });
@@ -815,13 +874,104 @@ const Account = () => {
                       </label>
                       <input
                         type="tel"
-                        value={profileForm.phone}
-                        onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                        value={profileForm.whatsappNumber || profileForm.phone || ''}
+                        onChange={(e) => setProfileForm({ ...profileForm, whatsappNumber: e.target.value })}
                         placeholder="WhatsApp contact"
                         className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-luxury-accent focus:bg-white"
                       />
                     </div>
                   </div>
+
+                  {/* Dynamic Custom Registration Fields (Configured by Admin) */}
+                  {customFieldsConfig.length > 0 && (
+                    <div className="pt-4 border-t border-gray-100 space-y-4">
+                      <h4 className="font-display font-bold text-xs uppercase tracking-wider text-gray-700">
+                        Additional Information
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {customFieldsConfig.map((field) => {
+                          const isEditable = field.isCustomerEditable !== false;
+                          const val = customFieldsValues[field.fieldKey] || '';
+
+                          return (
+                            <div key={field.id}>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                                  {field.fieldName} {field.isRequired && '*'}
+                                </label>
+                                {!isEditable && (
+                                  <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                    <Lock className="w-3 h-3" /> Read-only
+                                  </span>
+                                )}
+                              </div>
+
+                              {field.fieldType === 'DROPDOWN' ? (
+                                <select
+                                  disabled={!isEditable}
+                                  value={val}
+                                  onChange={(e) =>
+                                    setCustomFieldsValues({
+                                      ...customFieldsValues,
+                                      [field.fieldKey]: e.target.value,
+                                    })
+                                  }
+                                  className={`w-full border rounded-xl px-3.5 py-2.5 text-xs ${
+                                    isEditable
+                                      ? 'bg-gray-50 border-gray-200 text-gray-900 focus:outline-none focus:border-luxury-accent focus:bg-white'
+                                      : 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                >
+                                  <option value="">Select {field.fieldName}</option>
+                                  {field.options?.map((opt, i) => (
+                                    <option key={i} value={opt}>
+                                      {opt}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : field.fieldType === 'TEXTAREA' ? (
+                                <textarea
+                                  rows={2}
+                                  disabled={!isEditable}
+                                  value={val}
+                                  onChange={(e) =>
+                                    setCustomFieldsValues({
+                                      ...customFieldsValues,
+                                      [field.fieldKey]: e.target.value,
+                                    })
+                                  }
+                                  placeholder={field.placeholder || ''}
+                                  className={`w-full border rounded-xl px-3.5 py-2.5 text-xs ${
+                                    isEditable
+                                      ? 'bg-gray-50 border-gray-200 text-gray-900 focus:outline-none focus:border-luxury-accent focus:bg-white'
+                                      : 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                />
+                              ) : (
+                                <input
+                                  type={field.fieldType === 'NUMBER' ? 'number' : field.fieldType === 'DATE' ? 'date' : 'text'}
+                                  disabled={!isEditable}
+                                  value={val}
+                                  onChange={(e) =>
+                                    setCustomFieldsValues({
+                                      ...customFieldsValues,
+                                      [field.fieldKey]: e.target.value,
+                                    })
+                                  }
+                                  placeholder={field.placeholder || ''}
+                                  className={`w-full border rounded-xl px-3.5 py-2.5 text-xs ${
+                                    isEditable
+                                      ? 'bg-gray-50 border-gray-200 text-gray-900 focus:outline-none focus:border-luxury-accent focus:bg-white'
+                                      : 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                                  }`}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Save Button */}
                   <button
@@ -841,7 +991,7 @@ const Account = () => {
                 <div>
                   <h2 className="font-display font-black text-xl text-luxury-dark">My Orders & Tracking</h2>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    View complete footwear purchase history, track shipments, and request returns.
+                    View complete footwear purchase history, live tracking, and cancellation window.
                   </p>
                 </div>
 
@@ -849,17 +999,36 @@ const Account = () => {
                 <div className="flex flex-col sm:flex-row gap-3 items-center justify-between pb-4 border-b border-gray-100">
                   {/* Status Pills */}
                   <div className="flex gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
-                    {['ALL', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map((st) => (
+                    {[
+                      { id: 'ALL', label: 'All', count: orderCounts.ALL },
+                      { id: 'PENDING', label: 'Pending', count: orderCounts.PENDING },
+                      { id: 'APPROVED', label: 'Approved', count: orderCounts.APPROVED },
+                      { id: 'PROCESSING', label: 'Processing', count: orderCounts.PROCESSING },
+                      { id: 'SHIPPED', label: 'Shipped', count: orderCounts.SHIPPED },
+                      { id: 'DELIVERED', label: 'Delivered', count: orderCounts.DELIVERED },
+                      { id: 'CANCELLED', label: 'Cancelled', count: orderCounts.CANCELLED },
+                    ].map((st) => (
                       <button
-                        key={st}
-                        onClick={() => setOrderStatusFilter(st)}
-                        className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-colors whitespace-nowrap ${
-                          orderStatusFilter === st
-                            ? 'bg-luxury-dark text-white'
+                        key={st.id}
+                        onClick={() => setOrderStatusFilter(st.id)}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                          orderStatusFilter === st.id
+                            ? 'bg-luxury-dark text-white shadow-xs'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
-                        {st === 'ALL' ? 'All' : st.replace(/_/g, ' ')}
+                        <span>{st.label}</span>
+                        {st.count !== undefined && (
+                          <span
+                            className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                              orderStatusFilter === st.id
+                                ? 'bg-luxury-accent text-luxury-dark'
+                                : 'bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            {st.count}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -2059,6 +2228,20 @@ const Account = () => {
         addressToEdit={addressToEdit}
         onAddressSaved={loadAddresses}
       />
+
+      {/* Profile Image Square Crop Modal */}
+      {isCropModalOpen && (
+        <ImageCropModal
+          isOpen={isCropModalOpen}
+          initialImageFile={cropModalFile}
+          folder="slipper-store/profiles"
+          onClose={() => {
+            setIsCropModalOpen(false);
+            setCropModalFile(null);
+          }}
+          onCropComplete={handleCropComplete}
+        />
+      )}
 
       <WhatsAppFloatingButton />
       <MobileBottomNav />

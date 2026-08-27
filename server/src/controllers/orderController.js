@@ -158,7 +158,7 @@ const createOrder = async (req, res, next) => {
           userId: req.user.id,
           addressId: address.id,
           deliveryAddressSnapshot: JSON.stringify(shippingAddressSnapshot),
-          status: paymentMethod === 'COD' ? 'CONFIRMED' : 'PENDING',
+          status: 'PENDING',
           totalAmount: subtotal,
           discountAmount,
           shippingAmount: deliveryFee,
@@ -166,6 +166,28 @@ const createOrder = async (req, res, next) => {
           paymentMethod: paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD',
           paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PENDING',
           notes: notes ? notes.trim() : null,
+        },
+      });
+
+      // Initial Status History
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: 'PENDING',
+          actorRole: 'CUSTOMER',
+          actorId: req.user.id,
+          comment: 'Order placed by customer.',
+        },
+      });
+
+      // Create Admin Red Alert Notification
+      await tx.adminNotification.create({
+        data: {
+          type: 'NEW_ORDER',
+          title: `🔴 NEW ORDER: #${orderNumber}`,
+          message: `New slipper order for ₹${finalAmount} from ${req.user.name || 'Customer'}.`,
+          orderId: order.id,
+          customerId: req.user.id,
         },
       });
 
@@ -213,14 +235,14 @@ const createOrder = async (req, res, next) => {
         where: { cartId: cart.id },
       });
 
-      // Create Order Notification
+      // Create in-app Customer Notification
       await tx.notification.create({
         data: {
           userId: req.user.id,
           title: `Order Placed: #${orderNumber}`,
-          message: `Your order for ₹${finalAmount} has been confirmed. Thank you for shopping with AuraSole!`,
+          message: `Your order for ₹${finalAmount} has been placed. You will receive an approval update shortly!`,
           type: 'ORDER',
-          link: `/order-success/${orderNumber}`,
+          link: `/account/orders/${orderNumber}`,
         },
       });
 
@@ -271,7 +293,7 @@ const getUserOrders = async (req, res, next) => {
       }),
     };
 
-    const [total, orders] = await Promise.all([
+    const [total, orders, statusCounts] = await Promise.all([
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
@@ -291,12 +313,37 @@ const getUserOrders = async (req, res, next) => {
             },
           },
           address: true,
+          statusHistory: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
+      }),
+      prisma.order.groupBy({
+        by: ['status'],
+        where: { userId: req.user.id },
+        _count: { status: true },
       }),
     ]);
 
+    const counts = {
+      ALL: 0,
+      PENDING: 0,
+      APPROVED: 0,
+      PROCESSING: 0,
+      SHIPPED: 0,
+      DELIVERED: 0,
+      CANCELLED: 0,
+    };
+
+    statusCounts.forEach((sc) => {
+      counts[sc.status] = sc._count.status;
+      counts.ALL += sc._count.status;
+    });
+
     return successResponse(res, 'Orders retrieved', {
       orders,
+      counts,
       pagination: {
         total,
         page: pageNum,
@@ -326,12 +373,18 @@ const getOrderByNumber = async (req, res, next) => {
                 id: true,
                 name: true,
                 slug: true,
-                images: { where: { isPrimary: true }, select: { url: true }, take: 1 },
+                sku: true,
+                brand: true,
+                images: { select: { url: true, isPrimary: true } },
               },
             },
+            variant: true,
           },
         },
         address: true,
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
@@ -346,7 +399,7 @@ const getOrderByNumber = async (req, res, next) => {
 };
 
 /**
- * Cancel Order (Authoritative Stock Restoration)
+ * Cancel Order (Strict Server-Authoritative Deadline Check)
  */
 const cancelOrder = async (req, res, next) => {
   try {
@@ -362,12 +415,22 @@ const cancelOrder = async (req, res, next) => {
       return errorResponse(res, 'Order not found.', 404);
     }
 
-    // Cancellation eligibility check
-    const eligibleStatuses = ['PENDING', 'CONFIRMED', 'PROCESSING'];
-    if (!eligibleStatuses.includes(order.status)) {
+    // 1. Status Check
+    const nonCancellableStatuses = ['SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
+    if (nonCancellableStatuses.includes(order.status)) {
       return errorResponse(
         res,
-        `This order cannot be cancelled as it is already ${order.status.toLowerCase().replace(/_/g, ' ')}.`,
+        `Cannot cancel order as it is already ${order.status.toLowerCase().replace(/_/g, ' ')}.`,
+        400
+      );
+    }
+
+    // 2. Server-Authoritative Cancellation Deadline Enforcement
+    const now = new Date();
+    if (order.cancellationDeadline && now > new Date(order.cancellationDeadline)) {
+      return errorResponse(
+        res,
+        'Cancellation period has ended. Order is being prepared for dispatch.',
         400
       );
     }
@@ -378,11 +441,24 @@ const cancelOrder = async (req, res, next) => {
         where: { id: order.id },
         data: {
           status: 'CANCELLED',
-          notes: order.notes ? `${order.notes} | Cancellation Reason: ${reason}` : `Cancellation Reason: ${reason}`,
+          cancelledAt: now,
+          cancelledBy: 'CUSTOMER',
+          cancellationReason: reason.trim(),
         },
       });
 
-      // 2. Restore Inventory Stock for all items
+      // 2. Record Status History
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: 'CANCELLED',
+          actorRole: 'CUSTOMER',
+          actorId: req.user.id,
+          comment: `Customer cancelled order: ${reason.trim()}`,
+        },
+      });
+
+      // 3. Restore Inventory Stock for all items
       for (const item of order.items) {
         if (item.variantId) {
           await tx.productVariant.update({
@@ -398,7 +474,7 @@ const cancelOrder = async (req, res, next) => {
         }
       }
 
-      // 3. Create Notification
+      // 4. Create in-app Customer Notification
       await tx.notification.create({
         data: {
           userId: req.user.id,
@@ -408,12 +484,67 @@ const cancelOrder = async (req, res, next) => {
           link: `/account/orders/${order.orderNumber}`,
         },
       });
+
+      // 5. Create Admin Notification
+      await tx.adminNotification.create({
+        data: {
+          type: 'ORDER_CANCELLED',
+          title: `Customer Cancelled Order: #${order.orderNumber}`,
+          message: `Customer cancelled order #${order.orderNumber}. Reason: ${reason.trim()}`,
+          orderId: order.id,
+          customerId: req.user.id,
+        },
+      });
     });
 
     // Trigger Asynchronous Order Cancellation Email
     emailService.sendOrderCancelledEmail(order, req.user, reason);
 
     return successResponse(res, 'Order cancelled successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get Customer Order Counts / Stats
+ */
+const getUserOrderStats = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const [total, statusCounts, spendingAgg] = await Promise.all([
+      prisma.order.count({ where: { userId } }),
+      prisma.order.groupBy({
+        by: ['status'],
+        where: { userId },
+        _count: { status: true },
+      }),
+      prisma.order.aggregate({
+        where: { userId, status: { not: 'CANCELLED' } },
+        _sum: { finalAmount: true },
+      }),
+    ]);
+
+    const stats = {
+      total,
+      pending: 0,
+      approved: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+      totalSpent: spendingAgg._sum.finalAmount || 0,
+    };
+
+    statusCounts.forEach((sc) => {
+      const key = sc.status.toLowerCase();
+      if (stats[key] !== undefined) {
+        stats[key] = sc._count.status;
+      }
+    });
+
+    return successResponse(res, 'Customer order stats loaded', stats);
   } catch (error) {
     next(error);
   }
@@ -777,6 +908,7 @@ module.exports = {
   createQuickProductWhatsAppOrder,
   getUserOrders,
   getOrderByNumber,
+  getUserOrderStats,
   cancelOrder,
   requestReturn,
   reorder,

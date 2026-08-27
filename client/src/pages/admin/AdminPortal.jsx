@@ -58,6 +58,9 @@ import AdminBrandManager from '../../components/admin/AdminBrandManager';
 import AdminProductModal from '../../components/admin/AdminProductModal';
 import AdminSectionManager from '../../components/admin/AdminSectionManager';
 import AdminCustomFieldManager from '../../components/admin/AdminCustomFieldManager';
+import AdminOrderApprovalModal from '../../components/admin/AdminOrderApprovalModal';
+import AdminOrderDetailsModal from '../../components/admin/AdminOrderDetailsModal';
+import AdminCustomerDetailsModal from '../../components/admin/AdminCustomerDetailsModal';
 
 const AdminPortal = () => {
   const { settings: globalSettings, updateSettings: updateGlobalSettings } = useStoreSettings();
@@ -95,12 +98,27 @@ const AdminPortal = () => {
   const [newOrderStatus, setNewOrderStatus] = useState('');
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
   const [selectedOrderForView, setSelectedOrderForView] = useState(null);
+  const [selectedOrderForApproval, setSelectedOrderForApproval] = useState(null);
+  const [unreadNewOrdersCount, setUnreadNewOrdersCount] = useState(0);
+  const [orderCounts, setOrderCounts] = useState({
+    ALL: 0,
+    PENDING: 0,
+    APPROVED: 0,
+    PROCESSING: 0,
+    SHIPPED: 0,
+    DELIVERED: 0,
+    CANCELLED: 0,
+  });
 
   // Customers State
   const [customers, setCustomers] = useState([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [selectedCustomerForView, setSelectedCustomerForView] = useState(null);
+  const [selectedCustomerDetailsId, setSelectedCustomerDetailsId] = useState(null);
   const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [customerFilter, setCustomerFilter] = useState('ALL');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [adminNotifications, setAdminNotifications] = useState([]);
 
   // Offers & Deals State
   const [offers, setOffers] = useState([]);
@@ -235,7 +253,13 @@ const AdminPortal = () => {
     try {
       setIsLoadingOrders(true);
       const res = await adminService.getOrders({ status: orderStatusFilter, search: orderSearch });
-      if (res?.data?.orders) setOrders(res.data.orders);
+      if (res?.data?.orders) {
+        setOrders(res.data.orders);
+        if (res.data.counts) setOrderCounts(res.data.counts);
+        if (res.data.unreadNewOrdersCount !== undefined) {
+          setUnreadNewOrdersCount(res.data.unreadNewOrdersCount);
+        }
+      }
     } catch (err) {
       console.error('Failed to load orders:', err);
     } finally {
@@ -246,12 +270,26 @@ const AdminPortal = () => {
   const loadCustomers = async () => {
     try {
       setIsLoadingCustomers(true);
-      const res = await adminService.getCustomers();
+      const res = await adminService.getCustomers({ filter: customerFilter, search: customerSearch });
       if (res?.data?.customers) setCustomers(res.data.customers);
     } catch (err) {
       console.error('Failed to load customers:', err);
     } finally {
       setIsLoadingCustomers(false);
+    }
+  };
+
+  const loadAdminNotifications = async () => {
+    try {
+      const res = await adminService.getAdminNotifications();
+      if (res?.data?.notifications) {
+        setAdminNotifications(res.data.notifications);
+        if (res.data.newOrdersCount !== undefined) {
+          setUnreadNewOrdersCount(res.data.newOrdersCount);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load admin notifications:', err);
     }
   };
 
@@ -324,6 +362,7 @@ const AdminPortal = () => {
   useEffect(() => {
     loadDashboard();
     loadCategories();
+    loadAdminNotifications();
   }, []);
 
   useEffect(() => {
@@ -332,6 +371,7 @@ const AdminPortal = () => {
     if (activeTab === 'subcategories') loadSubcategories();
     if (activeTab === 'orders' || activeTab === 'whatsapp_orders' || activeTab === 'payments') loadOrders();
     if (activeTab === 'customers') loadCustomers();
+    if (activeTab === 'notifications') loadAdminNotifications();
     if (activeTab === 'offers') loadOffers();
     if (activeTab === 'festival_deals') loadFestivalDeals();
     if (activeTab === 'flash_sales') loadFlashSales();
@@ -339,7 +379,7 @@ const AdminPortal = () => {
     if (activeTab === 'coupons') loadCoupons();
     if (activeTab === 'banners') loadBanners();
     if (activeTab === 'audit-logs') loadAuditLogs();
-  }, [activeTab, productSearch, productCategoryFilter, orderStatusFilter, orderSearch]);
+  }, [activeTab, productSearch, productCategoryFilter, orderStatusFilter, orderSearch, customerFilter, customerSearch]);
 
   // Product Creation State & Handler
   const [productFormData, setProductFormData] = useState({
@@ -569,6 +609,7 @@ const AdminPortal = () => {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        unreadNewOrdersCount={unreadNewOrdersCount}
       />
 
       {/* Main Layout Area */}
@@ -582,6 +623,7 @@ const AdminPortal = () => {
             if (activeTab === 'orders') setOrderSearch(q);
           }}
           onSelectTab={setActiveTab}
+          unreadNewOrdersCount={unreadNewOrdersCount}
         />
 
         {/* Global Toast */}
@@ -805,20 +847,60 @@ const AdminPortal = () => {
           {/* ======================================================== */}
           {activeTab === 'customers' && (
             <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="font-display font-black text-xl text-white">Customer Directory</h2>
-                  <p className="text-xs text-stone-400 mt-0.5">Manage customer access, view purchase records & security.</p>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Search customer records, view saved addresses, dynamic fields, and security status.
+                  </p>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <div className="flex gap-1.5 p-1 bg-stone-900 border border-stone-800 rounded-2xl overflow-x-auto no-scrollbar w-full sm:w-auto">
+                    {[
+                      { id: 'ALL', label: 'All Customers' },
+                      { id: 'ACTIVE', label: 'Active' },
+                      { id: 'BLOCKED', label: 'Blocked' },
+                      { id: 'WITH_ORDERS', label: 'With Orders' },
+                      { id: 'NO_ORDERS', label: 'No Orders' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setCustomerFilter(f.id)}
+                        className={`px-3 py-1 text-xs font-bold rounded-xl whitespace-nowrap transition-colors ${
+                          customerFilter === f.id
+                            ? 'bg-luxury-accent text-stone-950 font-black'
+                            : 'text-stone-400 hover:text-white'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative w-full sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="Search name, phone, email, ID..."
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="w-full bg-stone-900 border border-stone-800 rounded-xl pl-8 pr-3.5 py-1.5 text-xs text-white placeholder-stone-500 focus:outline-none focus:border-luxury-accent"
+                    />
+                    <Search className="w-3.5 h-3.5 text-stone-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
                 </div>
               </div>
 
+              {/* Customers Table */}
               <div className="bg-stone-900 border border-stone-800 rounded-3xl overflow-hidden shadow-sm">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-stone-950 text-stone-400 font-bold uppercase tracking-wider border-b border-stone-800 text-[10px]">
                     <tr>
                       <th className="py-3.5 px-4">Customer</th>
                       <th className="py-3.5 px-4">Email</th>
-                      <th className="py-3.5 px-4">Phone / WhatsApp</th>
+                      <th className="py-3.5 px-4">Mobile / WhatsApp</th>
+                      <th className="py-3.5 px-4">Total Spent</th>
                       <th className="py-3.5 px-4">Orders</th>
                       <th className="py-3.5 px-4">Status</th>
                       <th className="py-3.5 px-4 text-right">Actions</th>
@@ -827,60 +909,71 @@ const AdminPortal = () => {
                   <tbody className="divide-y divide-stone-800 text-stone-300">
                     {customers.map((c) => (
                       <tr key={c.id} className="hover:bg-stone-800/50 transition-colors">
-                        <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-luxury-dark border border-luxury-accent/40 text-luxury-accent flex items-center justify-center font-bold text-xs">
-                            {c.name?.[0]?.toUpperCase() || 'C'}
+                        <td className="py-3 px-4 font-bold text-white flex items-center gap-2.5">
+                          {c.profileImage ? (
+                            <img
+                              src={c.profileImage}
+                              alt={c.name}
+                              className="w-8 h-8 rounded-full object-cover border border-luxury-accent/40 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-luxury-dark border border-luxury-accent/40 text-luxury-accent flex items-center justify-center font-black text-xs shrink-0">
+                              {c.name?.[0]?.toUpperCase() || 'C'}
+                            </div>
+                          )}
+                          <div>
+                            <span className="block">{c.name}</span>
+                            <span className="text-[10px] text-stone-500 font-mono">
+                              ID: {c.id?.slice(0, 8)}...
+                            </span>
                           </div>
-                          <span>{c.name}</span>
                         </td>
                         <td className="py-3 px-4 text-stone-400">{c.email}</td>
-                        <td className="py-3 px-4">{c.phone || c.whatsappNumber || '—'}</td>
-                        <td className="py-3 px-4 font-bold text-luxury-accent">{c._count?.orders || 0}</td>
+                        <td className="py-3 px-4 font-mono">
+                          {c.whatsappNumber || c.phone || '—'}
+                        </td>
+                        <td className="py-3 px-4 font-black text-luxury-accent">
+                          ₹{c.totalSpent || 0}
+                        </td>
+                        <td className="py-3 px-4 font-bold text-white">
+                          {c._count?.orders || 0}
+                        </td>
                         <td className="py-3 px-4">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              c.status === 'ACTIVE'
+                              c.status === 'ACTIVE' && !c.isBlocked
                                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                                 : 'bg-rose-950 text-rose-400 border border-rose-800'
                             }`}
                           >
-                            {c.status}
+                            {c.isBlocked ? 'BLOCKED' : c.status || 'ACTIVE'}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
-                              onClick={() => setSelectedCustomerForView(c)}
-                              className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl font-bold text-[11px]"
+                              onClick={() => setSelectedCustomerDetailsId(c.id)}
+                              className="px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl font-bold text-[11px] transition-colors"
                             >
-                              Profile
+                              Profile & Details
                             </button>
                             <button
                               type="button"
                               onClick={() => handleToggleCustomerBlock(c)}
-                              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold ${
-                                c.status === 'BLOCKED'
+                              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-colors ${
+                                c.status === 'BLOCKED' || c.isBlocked
                                   ? 'bg-emerald-900 text-emerald-200 hover:bg-emerald-800'
                                   : 'bg-amber-950 text-amber-300 hover:bg-amber-900'
                               }`}
                             >
-                              {c.status === 'BLOCKED' ? 'Unblock' : 'Block'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleForceLogoutCustomer(c)}
-                              className="px-2 py-1 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded-xl font-bold text-[10px] border border-rose-800 flex items-center gap-1 transition-colors"
-                              title="Force Logout from all devices"
-                            >
-                              <ShieldAlert className="w-3 h-3 text-rose-400" />
-                              <span>Force Logout</span>
+                              {c.status === 'BLOCKED' || c.isBlocked ? 'Unblock' : 'Block'}
                             </button>
                             <button
                               type="button"
                               onClick={() => setCustomerToDelete(c)}
-                              className="p-1.5 bg-rose-950 hover:bg-rose-900 text-rose-400 rounded-xl"
-                              title="Delete Customer"
+                              className="p-1.5 bg-rose-950 hover:bg-rose-900 text-rose-400 rounded-xl transition-colors"
+                              title="Deactivate Customer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -901,24 +994,44 @@ const AdminPortal = () => {
             <div className="space-y-6 animate-in fade-in">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="font-display font-black text-xl text-white">Order Operations</h2>
+                  <h2 className="font-display font-black text-xl text-white">Order Management & Logistics</h2>
                   <p className="text-xs text-stone-400 mt-0.5">
-                    Review orders, update dispatch status, assign courier tracking numbers.
+                    Approve orders, set cancellation deadline countdown, configure couriers & track packages.
                   </p>
                 </div>
 
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                  {['ALL', 'WHATSAPP_PENDING', 'CONFIRMED', 'PROCESSING', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED'].map((st) => (
+                {/* Status Pills with Dynamic DB Counts */}
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'ALL', label: 'All', count: orderCounts.ALL },
+                    { id: 'PENDING', label: 'Pending', count: orderCounts.PENDING },
+                    { id: 'APPROVED', label: 'Approved', count: orderCounts.APPROVED },
+                    { id: 'PROCESSING', label: 'Processing', count: orderCounts.PROCESSING },
+                    { id: 'SHIPPED', label: 'Shipped', count: orderCounts.SHIPPED },
+                    { id: 'DELIVERED', label: 'Delivered', count: orderCounts.DELIVERED },
+                    { id: 'CANCELLED', label: 'Cancelled', count: orderCounts.CANCELLED },
+                  ].map((st) => (
                     <button
-                      key={st}
-                      onClick={() => setOrderStatusFilter(st)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
-                        orderStatusFilter === st
-                          ? 'bg-luxury-accent text-stone-950 font-black'
+                      key={st.id}
+                      onClick={() => setOrderStatusFilter(st.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                        orderStatusFilter === st.id
+                          ? 'bg-luxury-accent text-stone-950 font-black shadow-sm'
                           : 'bg-stone-900 text-stone-400 hover:bg-stone-800'
                       }`}
                     >
-                      {st.replace(/_/g, ' ')}
+                      <span>{st.label}</span>
+                      {st.count !== undefined && (
+                        <span
+                          className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                            orderStatusFilter === st.id
+                              ? 'bg-stone-950 text-luxury-accent'
+                              : 'bg-stone-800 text-stone-400'
+                          }`}
+                        >
+                          {st.count}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -939,74 +1052,87 @@ const AdminPortal = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-800 text-stone-300">
-                    {orders.map((ord) => (
-                      <tr key={ord.id} className="hover:bg-stone-800/50 transition-colors">
-                        <td className="py-3 px-4 font-mono font-black text-white">#{ord.orderNumber}</td>
-                        <td className="py-3 px-4">
-                          <p className="font-bold text-stone-200">{ord.user?.name || 'Customer'}</p>
-                          <p className="text-[10px] text-stone-500">{ord.user?.phone || ord.user?.email}</p>
-                        </td>
-                        <td className="py-3 px-4 font-black text-luxury-accent">₹{ord.finalAmount}</td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
-                              ord.paymentMethod === 'RAZORPAY'
-                                ? 'bg-blue-950 text-blue-400 border border-blue-800'
-                                : ord.paymentMethod === 'WHATSAPP'
-                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                : 'bg-stone-800 text-stone-300'
-                            }`}
-                          >
-                            {ord.paymentMethod === 'WHATSAPP' && <MessageSquare className="w-3 h-3" />}
-                            {ord.paymentMethod} • {ord.paymentStatus}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              ord.status === 'DELIVERED'
-                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                : ord.status === 'CANCELLED'
-                                ? 'bg-rose-950 text-rose-400 border border-rose-800'
-                                : ord.status === 'WHATSAPP_PENDING'
-                                ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700 animate-pulse'
-                                : 'bg-amber-950 text-amber-400 border border-amber-800'
-                            }`}
-                          >
-                            {ord.status.replace(/_/g, ' ')}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-stone-400">
-                          {new Date(ord.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {ord.user?.phone && (
-                              <a
-                                href={`https://wa.me/${ord.user.phone.replace(/[^0-9]/g, '')}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 rounded-xl transition-colors"
-                                title="Chat with Customer on WhatsApp"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedOrderForStatus(ord);
-                                setNewOrderStatus(ord.status === 'WHATSAPP_PENDING' ? 'CONFIRMED' : ord.status);
-                                setTrackingNumberInput(ord.trackingNumber || '');
-                              }}
-                              className="px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl font-bold text-[11px] transition-colors"
+                    {orders.map((ord) => {
+                      const isPending = ord.status === 'PENDING' || ord.status === 'CONFIRMED' || ord.status === 'WHATSAPP_PENDING';
+                      return (
+                        <tr key={ord.id} className="hover:bg-stone-800/50 transition-colors">
+                          <td className="py-3 px-4 font-mono font-black text-white">#{ord.orderNumber}</td>
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-stone-200">{ord.user?.name || 'Customer'}</p>
+                            <p className="text-[10px] text-stone-500">{ord.user?.phone || ord.user?.email}</p>
+                          </td>
+                          <td className="py-3 px-4 font-black text-luxury-accent">₹{ord.finalAmount}</td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
+                                ord.paymentMethod === 'ONLINE' || ord.paymentMethod === 'RAZORPAY'
+                                  ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                                  : ord.paymentMethod === 'WHATSAPP'
+                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  : 'bg-stone-800 text-stone-300'
+                              }`}
                             >
-                              Update Status
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {ord.paymentMethod} • {ord.paymentStatus}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                ord.status === 'DELIVERED'
+                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  : ord.status === 'APPROVED'
+                                  ? 'bg-blue-950 text-blue-400 border border-blue-800'
+                                  : ord.status === 'SHIPPED'
+                                  ? 'bg-purple-950 text-purple-400 border border-purple-800'
+                                  : ord.status === 'CANCELLED'
+                                  ? 'bg-rose-950 text-rose-400 border border-rose-800'
+                                  : 'bg-amber-950 text-amber-400 border border-amber-800'
+                              }`}
+                            >
+                              {ord.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-stone-400">
+                            {new Date(ord.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Prominent Approve Order Button for Pending Orders */}
+                              {isPending && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOrderForApproval(ord)}
+                                  className="px-3 py-1 bg-luxury-accent hover:bg-amber-400 text-stone-950 rounded-xl font-black text-[11px] shadow-sm transition-all flex items-center gap-1"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Approve Order</span>
+                                </button>
+                              )}
+
+                              {ord.user?.phone && (
+                                <a
+                                  href={`https://wa.me/${ord.user.phone.replace(/[^0-9]/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-400 rounded-xl transition-colors"
+                                  title="Chat on WhatsApp"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForView(ord)}
+                                className="px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl font-bold text-[11px] transition-colors"
+                              >
+                                Details & Logs
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2560,12 +2686,196 @@ const AdminPortal = () => {
               </div>
             </div>
           )}
+
+          {/* ======================================================== */}
+          {/* 20. NOTIFICATIONS TAB */}
+          {/* ======================================================== */}
+          {activeTab === 'notifications' && (
+            <div className="space-y-6 animate-in fade-in max-w-4xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-display font-black text-xl text-white">Admin Notification Center</h2>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Live system alerts for new orders, customer cancellations, payments, and stock warnings.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await adminService.markAllAdminNotificationsRead();
+                        showToast('success', 'All notifications marked as read.');
+                        loadAdminNotifications();
+                      } catch (err) {
+                        showToast('error', err.message || 'Failed to mark all as read.');
+                      }
+                    }}
+                    className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Mark All as Read</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Notification List */}
+              <div className="space-y-3">
+                {adminNotifications.length > 0 ? (
+                  adminNotifications.map((notif) => {
+                    const isNewOrder = notif.type === 'NEW_ORDER';
+                    const isCancelled = notif.type === 'ORDER_CANCELLED';
+                    return (
+                      <div
+                        key={notif.id}
+                        className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          !notif.isRead
+                            ? 'bg-stone-900 border-luxury-accent/50 shadow-md'
+                            : 'bg-stone-950 border-stone-800/80 opacity-75'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`p-2.5 rounded-xl shrink-0 ${
+                              isNewOrder
+                                ? 'bg-rose-950 text-rose-400 border border-rose-800'
+                                : isCancelled
+                                ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                : 'bg-stone-900 text-stone-400 border border-stone-800'
+                            }`}
+                          >
+                            {isNewOrder ? (
+                              <ShoppingBag className="w-4 h-4" />
+                            ) : isCancelled ? (
+                              <AlertCircle className="w-4 h-4" />
+                            ) : (
+                              <Bell className="w-4 h-4" />
+                            )}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-sm text-white">{notif.title}</h4>
+                              {!notif.isRead && (
+                                <span className="px-2 py-0.2 rounded-full bg-rose-600 text-white text-[9px] font-black uppercase">
+                                  NEW
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-stone-400 mt-0.5">{notif.message}</p>
+                            <span className="text-[10px] text-stone-500 font-mono mt-1 block">
+                              {new Date(notif.createdAt).toLocaleString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {notif.orderId && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const res = await adminService.getOrderDetails(notif.orderId);
+                                  if (res?.data) setSelectedOrderForView(res.data);
+                                } catch (err) {
+                                  setActiveTab('orders');
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl font-bold text-xs transition-colors"
+                            >
+                              View Order
+                            </button>
+                          )}
+                          {!notif.isRead && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await adminService.markAdminNotificationRead(notif.id);
+                                  loadAdminNotifications();
+                                } catch (err) {
+                                  console.error(err);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 text-stone-400 hover:text-white text-xs font-bold transition-colors"
+                            >
+                              Mark Read
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-12 text-center bg-stone-900 border border-stone-800 rounded-3xl space-y-2">
+                    <Bell className="w-8 h-8 text-stone-600 mx-auto" />
+                    <p className="text-sm font-bold text-stone-400">No Notifications Yet</p>
+                    <p className="text-xs text-stone-500">
+                      When customers place orders or cancel shipments, alerts will appear here in real-time.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
       {/* ======================================================== */}
       {/* MODALS */}
       {/* ======================================================== */}
+
+      {/* Order Approval Modal */}
+      {selectedOrderForApproval && (
+        <AdminOrderApprovalModal
+          isOpen={!!selectedOrderForApproval}
+          order={selectedOrderForApproval}
+          onClose={() => setSelectedOrderForApproval(null)}
+          onApproved={() => {
+            loadOrders();
+            loadDashboard();
+            loadAdminNotifications();
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Admin Order Details Lightbox Modal */}
+      {selectedOrderForView && (
+        <AdminOrderDetailsModal
+          isOpen={!!selectedOrderForView}
+          order={selectedOrderForView}
+          onClose={() => setSelectedOrderForView(null)}
+          onOpenApprovalModal={(ord) => setSelectedOrderForApproval(ord)}
+          onOrderUpdated={() => {
+            loadOrders();
+            loadDashboard();
+            loadAdminNotifications();
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Admin Customer Details Modal */}
+      {selectedCustomerDetailsId && (
+        <AdminCustomerDetailsModal
+          isOpen={!!selectedCustomerDetailsId}
+          customerId={selectedCustomerDetailsId}
+          onClose={() => setSelectedCustomerDetailsId(null)}
+          onViewOrder={(ord) => setSelectedOrderForView(ord)}
+          onCustomerUpdated={() => {
+            loadCustomers();
+            loadDashboard();
+          }}
+          showToast={showToast}
+        />
+      )}
 
       {/* Add / Edit Slipper Product Modal */}
       <AdminProductModal

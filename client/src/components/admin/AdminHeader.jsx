@@ -4,7 +4,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useStoreSettings } from '../../context/StoreSettingsContext';
 import { Link } from 'react-router-dom';
 
-const AdminHeader = ({ activeTab, onToggleSidebar, onSearchQuery, onSelectTab }) => {
+const AdminHeader = ({
+  activeTab,
+  onToggleSidebar,
+  onSearchQuery,
+  onSelectTab,
+  unreadNewOrdersCount = 0,
+}) => {
   const { user, logout } = useAuth();
   const { settings } = useStoreSettings();
 
@@ -41,6 +47,18 @@ const AdminHeader = ({ activeTab, onToggleSidebar, onSearchQuery, onSelectTab })
 
       {/* Right: Security Badge, Notifications & Admin Profile */}
       <div className="flex items-center gap-2.5 sm:gap-3">
+        {/* 🔴 Glowing Red New Order Alert Badge */}
+        {unreadNewOrdersCount > 0 && (
+          <button
+            type="button"
+            onClick={() => onSelectTab && onSelectTab('orders')}
+            className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-xs font-black animate-pulse shadow-lg shadow-rose-600/30 transition-all border border-rose-400 cursor-pointer"
+          >
+            <span>🔴</span>
+            <span>NEW ORDER {unreadNewOrdersCount}</span>
+          </button>
+        )}
+
         {/* 2FA Protected Badge */}
         <div className="hidden lg:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-800 text-[10px] font-bold text-emerald-400">
           <ShieldCheck className="w-3.5 h-3.5" />
@@ -55,7 +73,11 @@ const AdminHeader = ({ activeTab, onToggleSidebar, onSearchQuery, onSelectTab })
           title="Notifications"
         >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-luxury-accent animate-pulse" />
+          {unreadNewOrdersCount > 0 ? (
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+          ) : (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-luxury-accent animate-pulse" />
+          )}
         </button>
 
         {/* Admin User Badge */}

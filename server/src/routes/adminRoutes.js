@@ -41,12 +41,23 @@ router.get('/brands/:id/products', adminController.getBrandProducts);
 
 // 6. Orders
 router.get('/orders', adminController.getAdminOrders);
+router.get('/orders/:id', adminController.getAdminOrderDetails);
+router.post('/orders/:id/approve', adminController.approveOrder);
 router.patch('/orders/:id/status', adminController.updateOrderStatus);
+
+// Admin Notifications Center
+router.get('/notifications', adminController.getAdminNotifications);
+router.patch('/notifications/:id/read', adminController.markAdminNotificationRead);
+router.post('/notifications/mark-all-read', adminController.markAllAdminNotificationsRead);
 
 // 5. Customers
 router.get('/customers', adminController.getAdminCustomers);
+router.get('/customers/:id', adminController.getAdminCustomerDetails);
 router.patch('/customers/:id/status', adminController.updateCustomerStatus);
+router.patch('/customers/:id/notes', adminController.updateCustomerAdminNotes);
 router.post('/customers/:id/force-logout', adminController.forceLogoutCustomer);
+router.post('/customers/:id/force-password-reset', adminController.forcePasswordResetCustomer);
+router.post('/customers/:id/deactivate', adminController.softDeleteCustomer);
 router.delete('/customers/:id', adminController.deleteCustomer);
 
 // 6. Reviews

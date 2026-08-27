@@ -531,27 +531,49 @@ const deleteProduct = async (req, res, next) => {
 };
 
 /**
+/**
  * 3. Orders Management
  */
 const getAdminOrders = async (req, res, next) => {
   try {
-    const { page = 1, limit = 15, status, search } = req.query;
+    const {
+      page = 1,
+      limit = 15,
+      status,
+      search,
+      paymentMethod,
+      paymentStatus,
+      startDate,
+      endDate,
+    } = req.query;
+
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(50, parseInt(limit, 10) || 15);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 15));
     const skip = (pageNum - 1) * limitNum;
 
     const where = {
       ...(status && status !== 'ALL' && { status }),
+      ...(paymentMethod && paymentMethod !== 'ALL' && { paymentMethod }),
+      ...(paymentStatus && paymentStatus !== 'ALL' && { paymentStatus }),
+      ...(startDate && endDate && {
+        createdAt: {
+          gte: new Date(startDate),
+          lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+        },
+      }),
       ...(search && {
         OR: [
           { orderNumber: { contains: search.trim(), mode: 'insensitive' } },
           { user: { name: { contains: search.trim(), mode: 'insensitive' } } },
           { user: { email: { contains: search.trim(), mode: 'insensitive' } } },
+          { user: { phone: { contains: search.trim(), mode: 'insensitive' } } },
+          { trackingNumber: { contains: search.trim(), mode: 'insensitive' } },
+          { items: { some: { productName: { contains: search.trim(), mode: 'insensitive' } } } },
         ],
       }),
     };
 
-    const [total, orders] = await Promise.all([
+    const [total, orders, statusCounts, unreadAlertsCount] = await Promise.all([
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
@@ -559,15 +581,384 @@ const getAdminOrders = async (req, res, next) => {
         take: limitNum,
         orderBy: { createdAt: 'desc' },
         include: {
-          user: { select: { id: true, name: true, email: true, phone: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              whatsappNumber: true,
+              profileImage: true,
+              status: true,
+            },
+          },
           address: true,
-          items: true,
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  slug: true,
+                  images: { where: { isPrimary: true }, select: { url: true }, take: 1 },
+                },
+              },
+            },
+          },
+          statusHistory: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
+      }),
+      prisma.order.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      }),
+      prisma.adminNotification.count({
+        where: { isRead: false, type: 'NEW_ORDER' },
       }),
     ]);
 
+    const counts = {
+      ALL: 0,
+      PENDING: 0,
+      APPROVED: 0,
+      PROCESSING: 0,
+      SHIPPED: 0,
+      DELIVERED: 0,
+      CANCELLED: 0,
+    };
+
+    statusCounts.forEach((sc) => {
+      counts[sc.status] = sc._count.status;
+      counts.ALL += sc._count.status;
+    });
+
     return successResponse(res, 'Admin orders retrieved', {
       orders,
+      counts,
+      unreadNewOrdersCount: unreadAlertsCount,
+      pagination: {
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum) || 1,
+        limit: limitNum,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAdminOrderDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.order.findFirst({
+      where: {
+        OR: [{ id }, { orderNumber: id }],
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            whatsappNumber: true,
+            profileImage: true,
+            customFields: true,
+            status: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+        address: true,
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                sku: true,
+                brand: true,
+                category: { select: { name: true } },
+                images: { select: { url: true, isPrimary: true } },
+              },
+            },
+            variant: true,
+          },
+        },
+        payments: {
+          orderBy: { createdAt: 'desc' },
+        },
+        statusHistory: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) return errorResponse(res, 'Order not found.', 404);
+
+    return successResponse(res, 'Order details retrieved', order);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const approveOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      cancellationDeadline,
+      shippingDate,
+      expectedDeliveryDate,
+      courierName,
+      trackingNumber,
+      trackingUrl,
+      adminNotes,
+      deliveryNotes,
+    } = req.body;
+
+    const order = await prisma.order.findFirst({
+      where: { OR: [{ id }, { orderNumber: id }] },
+      include: { user: true, items: true },
+    });
+
+    if (!order) return errorResponse(res, 'Order not found.', 404);
+
+    if (order.status !== 'PENDING' && order.status !== 'CONFIRMED' && order.status !== 'WHATSAPP_PENDING') {
+      return errorResponse(res, `Cannot approve order currently in ${order.status} status.`, 400);
+    }
+
+    // Validate dates
+    const parsedDeadline = cancellationDeadline ? new Date(cancellationDeadline) : new Date(Date.now() + 24 * 3600 * 1000);
+    const parsedShipping = shippingDate ? new Date(shippingDate) : null;
+    const parsedDelivery = expectedDeliveryDate ? new Date(expectedDeliveryDate) : null;
+
+    if (parsedShipping && parsedDelivery && parsedDelivery < parsedShipping) {
+      return errorResponse(res, 'Expected delivery date cannot be earlier than shipping date.', 422);
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const ord = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'APPROVED',
+          cancellationDeadline: parsedDeadline,
+          shippingDate: parsedShipping,
+          expectedDeliveryDate: parsedDelivery,
+          courierName: courierName ? courierName.trim() : order.courierName,
+          trackingNumber: trackingNumber ? trackingNumber.trim() : order.trackingNumber,
+          trackingUrl: trackingUrl ? trackingUrl.trim() : order.trackingUrl,
+          adminNotes: adminNotes ? adminNotes.trim() : order.adminNotes,
+          deliveryNotes: deliveryNotes ? deliveryNotes.trim() : order.deliveryNotes,
+        },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: 'APPROVED',
+          actorRole: 'ADMIN',
+          actorId: req.user.id,
+          comment: `Order approved by admin. Cancellation available until ${parsedDeadline.toLocaleString('en-IN')}.`,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: order.userId,
+          title: `Order Approved: #${order.orderNumber}`,
+          message: `Your slipper order #${order.orderNumber} has been approved. You may cancel until ${parsedDeadline.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
+          type: 'ORDER',
+          link: `/account/orders/${order.orderNumber}`,
+        },
+      });
+
+      return ord;
+    });
+
+    if (order.user) {
+      emailService.sendOrderConfirmedEmail(updated, order.user);
+    }
+
+    await logAdminAction(req.user.id, 'ORDER_APPROVED', {
+      orderNumber: order.orderNumber,
+      cancellationDeadline: parsedDeadline,
+    });
+
+    return successResponse(res, 'Order approved successfully.', updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateOrderStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      status,
+      trackingNumber,
+      courierName,
+      trackingUrl,
+      shippingDate,
+      expectedDeliveryDate,
+      notes,
+      adminNotes,
+      cancellationReason,
+    } = req.body;
+
+    const order = await prisma.order.findFirst({
+      where: { OR: [{ id }, { orderNumber: id }] },
+      include: { user: true, items: true },
+    });
+
+    if (!order) return errorResponse(res, 'Order not found.', 404);
+
+    const now = new Date();
+    const isShipped = status === 'SHIPPED';
+    const isDelivered = status === 'DELIVERED';
+    const isCancelled = status === 'CANCELLED';
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1. If cancelling, restore inventory stock
+      if (isCancelled && order.status !== 'CANCELLED') {
+        for (const item of order.items) {
+          if (item.variantId) {
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: { increment: item.quantity } },
+            });
+          }
+          if (item.productId) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: item.quantity } },
+            });
+          }
+        }
+      }
+
+      // 2. Update Order
+      const ord = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          ...(status && { status }),
+          ...(trackingNumber !== undefined && { trackingNumber: trackingNumber ? trackingNumber.trim() : null }),
+          ...(courierName !== undefined && { courierName: courierName ? courierName.trim() : null }),
+          ...(trackingUrl !== undefined && { trackingUrl: trackingUrl ? trackingUrl.trim() : null }),
+          ...(shippingDate && { shippingDate: new Date(shippingDate) }),
+          ...(expectedDeliveryDate && { expectedDeliveryDate: new Date(expectedDeliveryDate) }),
+          ...(notes !== undefined && { notes }),
+          ...(adminNotes !== undefined && { adminNotes }),
+          ...(isShipped && { shippedAt: now }),
+          ...(isDelivered && { deliveredAt: now, paymentStatus: 'PAID' }),
+          ...(isCancelled && {
+            cancelledAt: now,
+            cancelledBy: 'ADMIN',
+            cancellationReason: cancellationReason || 'Cancelled by administrator.',
+          }),
+        },
+      });
+
+      // 3. Record OrderStatusHistory
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: status || order.status,
+          actorRole: 'ADMIN',
+          actorId: req.user.id,
+          comment: isCancelled
+            ? (cancellationReason || 'Cancelled by store administrator.')
+            : isShipped
+            ? `Shipped via ${courierName || 'Express Courier'} (Tracking: ${trackingNumber || 'N/A'})`
+            : isDelivered
+            ? 'Delivered to customer doorstep.'
+            : `Order transitioned to ${status}.`,
+        },
+      });
+
+      // 4. Create in-app Customer Notification
+      await tx.notification.create({
+        data: {
+          userId: order.userId,
+          title: isDelivered
+            ? `Order Delivered: #${order.orderNumber} 🎉`
+            : isShipped
+            ? `Order Shipped: #${order.orderNumber} 🚚`
+            : isCancelled
+            ? `Order Cancelled: #${order.orderNumber}`
+            : `Order Update: #${order.orderNumber} (${status})`,
+          message: isDelivered
+            ? `Your order #${order.orderNumber} has been delivered! Tap to leave a verified review.`
+            : isShipped
+            ? `Your order #${order.orderNumber} is on the way! Courier: ${courierName || 'Standard'} ${trackingNumber ? `(${trackingNumber})` : ''}`
+            : isCancelled
+            ? `Your order #${order.orderNumber} was cancelled. ${cancellationReason || ''}`
+            : `Your order #${order.orderNumber} status changed to ${status.toLowerCase().replace(/_/g, ' ')}.`,
+          type: isDelivered ? 'ORDER_DELIVERED' : isShipped ? 'ORDER_SHIPPED' : 'ORDER',
+          link: `/account/orders/${order.orderNumber}`,
+        },
+      });
+
+      return ord;
+    });
+
+    // 5. Trigger Asynchronous Transactional Emails
+    if (order.user) {
+      if (status === 'SHIPPED') {
+        emailService.sendOrderShippedEmail(updated, order.user, trackingNumber);
+      } else if (status === 'DELIVERED') {
+        emailService.sendOrderDeliveredEmail(updated, order.user);
+      } else if (status === 'CANCELLED') {
+        emailService.sendOrderCancelledEmail(updated, order.user, cancellationReason || 'Cancelled by store administrator.');
+      }
+    }
+
+    await logAdminAction(req.user.id, 'ORDER_STATUS_CHANGED', {
+      orderNumber: order.orderNumber,
+      newStatus: status,
+      trackingNumber,
+    });
+
+    return successResponse(res, `Order #${order.orderNumber} updated to ${status}`, updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 4. Admin Notification Center (🔴 Red Alerts & Unread Badges)
+ */
+const getAdminNotifications = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, type } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {
+      ...(type && type !== 'ALL' && { type }),
+    };
+
+    const [total, unreadCount, newOrdersCount, notifications] = await Promise.all([
+      prisma.adminNotification.count({ where }),
+      prisma.adminNotification.count({ where: { isRead: false } }),
+      prisma.adminNotification.count({ where: { isRead: false, type: 'NEW_ORDER' } }),
+      prisma.adminNotification.findMany({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return successResponse(res, 'Admin notifications retrieved', {
+      notifications,
+      unreadCount,
+      newOrdersCount,
       pagination: {
         total,
         page: pageNum,
@@ -579,87 +970,59 @@ const getAdminOrders = async (req, res, next) => {
   }
 };
 
-const updateOrderStatus = async (req, res, next) => {
+const markAdminNotificationRead = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status, trackingNumber, notes } = req.body;
-
-    const order = await prisma.order.findUnique({
+    const updated = await prisma.adminNotification.update({
       where: { id },
-      include: { user: true },
+      data: { isRead: true, readAt: new Date() },
     });
+    return successResponse(res, 'Notification marked as read', updated);
+  } catch (error) {
+    next(error);
+  }
+};
 
-    if (!order) return errorResponse(res, 'Order not found.', 404);
-
-    const updated = await prisma.order.update({
-      where: { id },
-      data: {
-        ...(status && { status }),
-        ...(trackingNumber && { trackingNumber }),
-        ...(notes && { notes }),
-        ...(status === 'SHIPPED' && { shippedAt: new Date() }),
-        ...(status === 'DELIVERED' && { deliveredAt: new Date(), paymentStatus: 'PAID' }),
-      },
+const markAllAdminNotificationsRead = async (req, res, next) => {
+  try {
+    await prisma.adminNotification.updateMany({
+      where: { isRead: false },
+      data: { isRead: true, readAt: new Date() },
     });
-
-    // Notify customer in-app
-    await prisma.notification.create({
-      data: {
-        userId: order.userId,
-        title: `Order Status: ${status.replace(/_/g, ' ')}`,
-        message: `Your slipper order #${order.orderNumber} is now ${status.toLowerCase().replace(/_/g, ' ')}.`,
-        type: 'ORDER',
-        link: `/account/orders/${order.orderNumber}`,
-      },
-    });
-
-    // Trigger Asynchronous Email Notifications
-    if (order.user) {
-      if (status === 'CONFIRMED') {
-        emailService.sendOrderConfirmedEmail(updated, order.user);
-      } else if (status === 'SHIPPED') {
-        emailService.sendOrderShippedEmail(updated, order.user, trackingNumber);
-      } else if (status === 'DELIVERED') {
-        emailService.sendOrderDeliveredEmail(updated, order.user);
-      } else if (status === 'CANCELLED') {
-        emailService.sendOrderCancelledEmail(updated, order.user, notes);
-      }
-    }
-
-    await logAdminAction(req.user.id, 'ORDER_STATUS_CHANGED', {
-      orderNumber: order.orderNumber,
-      newStatus: status,
-    });
-
-    return successResponse(res, 'Order status updated', updated);
+    return successResponse(res, 'All admin notifications marked as read');
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * 4. Customers Management
+ * 5. Customers Management (Deep Directory, Profiles, Addresses, Orders & Security)
  */
 const getAdminCustomers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 15, search, status } = req.query;
+    const { page = 1, limit = 15, search, status, filter } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(50, parseInt(limit, 10) || 15);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 15));
     const skip = (pageNum - 1) * limitNum;
 
     const where = {
       role: 'CUSTOMER',
-      ...(status && { status }),
+      ...(status && status !== 'ALL' && { status }),
+      ...(filter === 'WITH_ORDERS' && { orders: { some: {} } }),
+      ...(filter === 'NO_ORDERS' && { orders: { none: {} } }),
+      ...(filter === 'BLOCKED' && { isBlocked: true }),
       ...(search && {
         OR: [
           { name: { contains: search.trim(), mode: 'insensitive' } },
           { email: { contains: search.trim(), mode: 'insensitive' } },
           { phone: { contains: search.trim(), mode: 'insensitive' } },
+          { whatsappNumber: { contains: search.trim(), mode: 'insensitive' } },
+          { id: { contains: search.trim(), mode: 'insensitive' } },
         ],
       }),
     };
 
-    const [total, customers] = await Promise.all([
+    const [total, rawCustomers] = await Promise.all([
       prisma.user.count({ where }),
       prisma.user.findMany({
         where,
@@ -671,12 +1034,39 @@ const getAdminCustomers = async (req, res, next) => {
           name: true,
           email: true,
           phone: true,
+          whatsappNumber: true,
+          profileImage: true,
           status: true,
+          isBlocked: true,
+          blockedReason: true,
+          adminNotes: true,
+          lastLoginAt: true,
           createdAt: true,
-          _count: { select: { orders: true, reviews: true } },
+          _count: { select: { orders: true, reviews: true, addresses: true } },
+          orders: {
+            where: { status: { not: 'CANCELLED' } },
+            select: { finalAmount: true, createdAt: true, status: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
       }),
     ]);
+
+    // Calculate customer total spent deterministically
+    const customers = await Promise.all(
+      rawCustomers.map(async (c) => {
+        const spendingAgg = await prisma.order.aggregate({
+          where: { userId: c.id, status: { not: 'CANCELLED' } },
+          _sum: { finalAmount: true },
+        });
+        return {
+          ...c,
+          totalSpent: spendingAgg._sum.finalAmount || 0,
+          lastOrderDate: c.orders[0]?.createdAt || null,
+        };
+      })
+    );
 
     return successResponse(res, 'Admin customers retrieved', {
       customers,
@@ -684,8 +1074,132 @@ const getAdminCustomers = async (req, res, next) => {
         total,
         page: pageNum,
         totalPages: Math.ceil(total / limitNum) || 1,
+        limit: limitNum,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAdminCustomerDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        addresses: { orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] },
+        orders: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: true,
+            statusHistory: { orderBy: { createdAt: 'desc' }, take: 1 },
+          },
+        },
+        notifications: { orderBy: { createdAt: 'desc' }, take: 10 },
+        sessions: { where: { isRevoked: false }, orderBy: { lastActivityAt: 'desc' } },
+        _count: { select: { orders: true, reviews: true, addresses: true } },
+      },
+    });
+
+    if (!customer) return errorResponse(res, 'Customer not found.', 404);
+
+    // Calculate real stats
+    const totalSpentAgg = await prisma.order.aggregate({
+      where: { userId: id, status: { not: 'CANCELLED' } },
+      _sum: { finalAmount: true },
+    });
+
+    const statusCounts = await prisma.order.groupBy({
+      by: ['status'],
+      where: { userId: id },
+      _count: { status: true },
+    });
+
+    const counts = {
+      total: customer.orders.length,
+      pending: 0,
+      approved: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+      totalSpent: totalSpentAgg._sum.finalAmount || 0,
+    };
+
+    statusCounts.forEach((sc) => {
+      if (counts[sc.status.toLowerCase()] !== undefined) {
+        counts[sc.status.toLowerCase()] = sc._count.status;
+      }
+    });
+
+    return successResponse(res, 'Customer details retrieved', {
+      customer,
+      stats: counts,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateCustomerAdminNotes = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { adminNotes } = req.body;
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { adminNotes: adminNotes ? adminNotes.trim() : null },
+      select: { id: true, adminNotes: true },
+    });
+
+    await logAdminAction(req.user.id, 'CUSTOMER_NOTES_UPDATED', { customerId: id });
+    return successResponse(res, 'Admin notes updated.', updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const forcePasswordResetCustomer = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const customer = await prisma.user.findUnique({ where: { id } });
+    if (!customer) return errorResponse(res, 'Customer not found.', 404);
+
+    const authService = require('../services/authService');
+    await authService.forgotPassword(customer.email);
+
+    await logAdminAction(req.user.id, 'CUSTOMER_FORCE_PASSWORD_RESET', {
+      customerId: id,
+      customerEmail: customer.email,
+    });
+
+    return successResponse(res, `Password reset email dispatched to ${customer.email}.`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const softDeleteCustomer = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const customer = await prisma.user.findUnique({ where: { id } });
+    if (!customer) return errorResponse(res, 'Customer not found.', 404);
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        status: 'DELETED',
+        isBlocked: true,
+        blockedReason: 'Account deactivated/deleted by administrator. Historical orders preserved.',
+      },
+    });
+
+    await sessionService.revokeAllUserSessions(id, 'ADMIN_DEACTIVATE_ACCOUNT', true);
+
+    await logAdminAction(req.user.id, 'CUSTOMER_DEACTIVATED', { customerId: id });
+    return successResponse(res, `Customer ${customer.name || customer.email} deactivated. Order history preserved.`);
   } catch (error) {
     next(error);
   }

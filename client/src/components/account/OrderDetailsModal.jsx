@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Package,
@@ -11,6 +11,12 @@ import {
   ShoppingBag,
   Loader2,
   Star,
+  ExternalLink,
+  ShieldCheck,
+  Calendar,
+  Phone,
+  Timer,
+  AlertTriangle,
 } from 'lucide-react';
 import orderService from '../../services/orderService';
 import { useCart } from '../../context/CartContext';
@@ -32,51 +38,62 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
   const [isReordering, setIsReordering] = useState(false);
   const [reviewingProduct, setReviewingProduct] = useState(null);
 
+  // Server-Authoritative Cancellation Countdown Timer
+  const [timeLeftStr, setTimeLeftStr] = useState('');
+  const [isCancellationExpired, setIsCancellationExpired] = useState(false);
+
+  useEffect(() => {
+    if (!order?.cancellationDeadline) {
+      setIsCancellationExpired(false);
+      return;
+    }
+
+    const deadline = new Date(order.cancellationDeadline).getTime();
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = deadline - now;
+
+      if (diff <= 0) {
+        setTimeLeftStr('00:00:00');
+        setIsCancellationExpired(true);
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeftStr(
+          `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+        );
+        setIsCancellationExpired(false);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [order?.cancellationDeadline]);
+
   if (!isOpen || !order) return null;
 
-  // Order Progression Steps
-  const statusSteps = [
-    { label: 'Order Placed', key: 'PENDING' },
-    { label: 'Confirmed', key: 'CONFIRMED' },
-    { label: 'Processing', key: 'PROCESSING' },
-    { label: 'Packed & Dispatched', key: 'PACKED' },
-    { label: 'Shipped', key: 'SHIPPED' },
-    { label: 'Out for Delivery', key: 'OUT_FOR_DELIVERY' },
-    { label: 'Delivered', key: 'DELIVERED' },
-  ];
-
-  const statusOrderMap = {
-    PENDING: 1,
-    CONFIRMED: 2,
-    PROCESSING: 3,
-    PACKED: 4,
-    SHIPPED: 5,
-    OUT_FOR_DELIVERY: 6,
-    DELIVERED: 7,
-    CANCELLED: 0,
-    RETURN_REQUESTED: 7,
-    RETURNED: 7,
-  };
-
-  const currentStepNum = statusOrderMap[order.status] || 1;
   const isCancelled = order.status === 'CANCELLED';
-  const isEligibleForCancel = ['PENDING', 'CONFIRMED', 'PROCESSING'].includes(order.status);
   const isDelivered = order.status === 'DELIVERED';
+  const isShippedOrLater = ['SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'REFUNDED'].includes(order.status);
+  const isEligibleForCancel = !isShippedOrLater && !isCancellationExpired;
 
-  // Handle Cancel
+  // Handle Customer Cancellation
   const handleCancelOrder = async () => {
     setActionError(null);
     setIsSubmittingCancel(true);
     try {
       await orderService.cancelOrder(order.orderNumber, cancelReason);
-      setActionSuccess('Order cancelled successfully.');
+      setActionSuccess('Order cancelled successfully. Restocked inventory is now available.');
       if (onOrderUpdated) onOrderUpdated();
       setTimeout(() => {
         setIsCancelling(false);
         setActionSuccess(null);
-      }, 1500);
+      }, 2000);
     } catch (err) {
-      setActionError(err.message || 'Failed to cancel order.');
+      setActionError(err.message || 'Cancellation period has ended or order cannot be cancelled.');
     } finally {
       setIsSubmittingCancel(false);
     }
@@ -91,12 +108,12 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
         reason: returnReason,
         comments: returnComments,
       });
-      setActionSuccess('Return request submitted.');
+      setActionSuccess('Return request submitted. Our team will verify and coordinate pickup.');
       if (onOrderUpdated) onOrderUpdated();
       setTimeout(() => {
         setIsReturning(false);
         setActionSuccess(null);
-      }, 1500);
+      }, 2000);
     } catch (err) {
       setActionError(err.message || 'Failed to request return.');
     } finally {
@@ -120,6 +137,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
     }
   };
 
+  // Safe Address Snapshot Parsing
   let shippingAddr = null;
   if (order.deliveryAddressSnapshot) {
     try {
@@ -147,23 +165,27 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
         {/* Header */}
         <div className="flex items-start justify-between pb-4 border-b border-gray-100">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-display font-black text-lg text-luxury-dark">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-display font-black text-xl text-luxury-dark">
                 Order #{order.orderNumber}
               </span>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                   order.status === 'DELIVERED'
-                    ? 'bg-emerald-50 text-emerald-700'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : order.status === 'APPROVED'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : order.status === 'SHIPPED'
+                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
                     : order.status === 'CANCELLED'
-                    ? 'bg-rose-50 text-rose-700'
-                    : 'bg-amber-50 text-amber-800'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
                 }`}
               >
                 {order.status.replace(/_/g, ' ')}
               </span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-500 mt-1">
               Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', {
                 day: 'numeric',
                 month: 'short',
@@ -176,7 +198,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -196,83 +218,161 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
           </div>
         )}
 
-        {/* Tracking Timeline (if not cancelled) */}
-        {!isCancelled ? (
-          <div className="p-4 sm:p-5 rounded-2xl bg-luxury-warmWhite/80 border border-gray-100 space-y-3">
-            <h4 className="font-display font-bold text-xs uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
-              <Truck className="w-4 h-4 text-luxury-accent" /> Live Order Tracking
-            </h4>
-
-            {/* Desktop Horizontal / Mobile Vertical Stepper */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-xs">
-              {['Order Placed', 'Processing', 'Shipped', 'Delivered'].map((step, idx) => {
-                const stepThreshold = [1, 3, 5, 7][idx];
-                const isPassed = currentStepNum >= stepThreshold;
-                return (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                        isPassed
-                          ? 'bg-luxury-dark text-luxury-accent shadow-xs'
-                          : 'bg-gray-200 text-gray-400'
-                      }`}
-                    >
-                      {isPassed ? '✓' : idx + 1}
-                    </div>
-                    <span
-                      className={`text-[11px] font-semibold ${
-                        isPassed ? 'text-gray-900' : 'text-gray-400'
-                      }`}
-                    >
-                      {step}
-                    </span>
-                  </div>
-                );
-              })}
+        {/* Server-Authoritative Cancellation Countdown Banner */}
+        {!isShippedOrLater && order.cancellationDeadline && (
+          <div
+            className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+              isCancellationExpired
+                ? 'bg-stone-50 border-stone-200 text-stone-600'
+                : 'bg-amber-50/80 border-amber-200 text-amber-900'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Timer className={`w-5 h-5 shrink-0 ${isCancellationExpired ? 'text-stone-400' : 'text-amber-600 animate-pulse'}`} />
+              <div>
+                <p className="font-bold">
+                  {isCancellationExpired
+                    ? 'Cancellation Window Closed'
+                    : `Order Cancellation Available Until: ${new Date(order.cancellationDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                </p>
+                <p className="text-[11px] text-gray-500">
+                  {isCancellationExpired
+                    ? 'Your footwear order has been approved and is scheduled for shipment.'
+                    : 'You can cancel with full refund before the countdown expires.'}
+                </p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>This order was cancelled. Restocked inventory is available in store.</span>
+
+            {!isCancellationExpired && (
+              <div className="px-3 py-1 bg-amber-100 text-amber-950 font-mono font-black text-xs rounded-xl border border-amber-300 shrink-0">
+                {timeLeftStr}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Items List */}
+        {/* Live Tracking Timeline */}
+        {!isCancelled ? (
+          <div className="p-4 sm:p-5 rounded-3xl bg-luxury-warmWhite/80 border border-gray-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-display font-bold text-xs uppercase tracking-wider text-gray-800 flex items-center gap-1.5">
+                <Truck className="w-4 h-4 text-luxury-accent" />
+                <span>Live Order Timeline</span>
+              </h4>
+              {order.trackingNumber && (
+                <div className="flex items-center gap-1.5 text-xs text-luxury-accent font-bold">
+                  <span>Tracking: {order.trackingNumber}</span>
+                  {order.trackingUrl && (
+                    <a
+                      href={order.trackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline inline-flex items-center gap-0.5 text-[11px]"
+                    >
+                      Track Package <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Stepper Display */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-xs">
+              {[
+                { label: 'Order Placed', step: 1, active: true },
+                { label: 'Approved', step: 2, active: ['APPROVED', 'PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(order.status) },
+                { label: 'Shipped', step: 3, active: ['SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(order.status) },
+                { label: 'Delivered', step: 4, active: order.status === 'DELIVERED' },
+              ].map((s, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      s.active
+                        ? 'bg-luxury-dark text-luxury-accent shadow-xs'
+                        : 'bg-gray-200 text-gray-400'
+                    }`}
+                  >
+                    {s.active ? '✓' : idx + 1}
+                  </div>
+                  <span
+                    className={`text-[11px] font-semibold ${
+                      s.active ? 'text-gray-900' : 'text-gray-400'
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Expected Delivery & Shipping Dates */}
+            {(order.expectedDeliveryDate || order.shippingDate) && (
+              <div className="pt-2 border-t border-gray-200/60 flex flex-wrap gap-4 text-xs text-gray-600">
+                {order.shippingDate && (
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-luxury-accent" />
+                    <span>Dispatched: <strong>{new Date(order.shippingDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</strong></span>
+                  </div>
+                )}
+                {order.expectedDeliveryDate && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Expected Delivery: <strong className="text-emerald-700">{new Date(order.expectedDeliveryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1">
+            <div className="flex items-center gap-2 font-bold">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>This order was cancelled.</span>
+            </div>
+            {order.cancellationReason && (
+              <p className="text-[11px] text-rose-700 pl-6">Reason: {order.cancellationReason}</p>
+            )}
+          </div>
+        )}
+
+        {/* Slippers Purchased List */}
         <div className="space-y-3">
           <h4 className="font-display font-bold text-xs uppercase tracking-wider text-gray-700">
-            Slippers Purchased
+            Slippers in Order ({order.items?.length || 0})
           </h4>
-          <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl p-2 bg-white">
+          <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl p-2 bg-white shadow-xs">
             {order.items?.map((item) => (
               <div key={item.id} className="py-3 px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-3">
                   <img
                     src={
                       item.product?.images?.[0]?.url ||
+                      item.productImage ||
                       'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?q=80&w=120'
                     }
                     alt={item.productName}
-                    className="w-12 h-12 rounded-xl object-cover bg-stone-100 shrink-0"
+                    className="w-14 h-14 rounded-2xl object-cover bg-stone-100 border border-gray-200 shrink-0"
                   />
                   <div>
-                    <p className="font-bold text-gray-900">{item.productName}</p>
-                    <p className="text-[11px] text-gray-500">
-                      Color: {item.color} • Size UK {item.size} • Qty: {item.quantity}
+                    <p className="font-bold text-gray-900 text-sm">{item.productName}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Color: <strong>{item.color || 'Standard'}</strong> • Size: <strong>UK {item.size || 'Standard'}</strong> • Qty: <strong>{item.quantity}</strong>
                     </p>
+                    <p className="text-[11px] font-mono text-gray-400">Unit Price: ₹{item.unitPrice}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-3">
-                  <span className="font-black text-luxury-dark">₹{item.totalPrice}</span>
+                  <span className="font-black text-sm text-luxury-dark">₹{item.totalPrice}</span>
+                  {/* Review Button strictly allowed only on DELIVERED */}
                   {order.status === 'DELIVERED' && (
                     <button
                       type="button"
                       onClick={() => setReviewingProduct(item.product || { id: item.productId, name: item.productName, images: item.product?.images })}
-                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-bold text-[11px] flex items-center gap-1 transition-colors border border-amber-200/60"
+                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-bold text-[11px] flex items-center gap-1 transition-colors border border-amber-200/60 shadow-xs"
                     >
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span>Rate & Review</span>
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>Write Review</span>
                     </button>
                   )}
                 </div>
@@ -287,7 +387,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
           <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-1.5">
             <div className="flex items-center gap-1.5 font-bold text-gray-800">
               <MapPin className="w-3.5 h-3.5 text-luxury-accent" />
-              <span>Delivery Address</span>
+              <span>Historical Delivery Address</span>
             </div>
             {shippingAddr && (
               <div className="text-gray-600 space-y-0.5 pt-1">
@@ -297,7 +397,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
                 <p>
                   {shippingAddr.city}, {shippingAddr.state} — {shippingAddr.postalCode}
                 </p>
-                <p className="text-[11px] text-gray-500">Phone: {shippingAddr.phone}</p>
+                <p className="text-[11px] text-gray-500">Mobile: {shippingAddr.phone}</p>
               </div>
             )}
           </div>
@@ -315,14 +415,18 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
               </div>
             )}
             <div className="flex justify-between text-gray-600">
-              <span>Delivery Charge:</span>
+              <span>Shipping Fee:</span>
               <span className="font-bold">
                 {order.shippingAmount === 0 ? 'FREE' : `₹${order.shippingAmount}`}
               </span>
             </div>
-            <div className="pt-2 border-t border-gray-200 flex justify-between items-baseline font-black text-sm text-luxury-dark">
-              <span>Total Paid / Payable:</span>
-              <span>₹{order.finalAmount}</span>
+            <div className="pt-2 border-t border-gray-200 flex justify-between items-baseline font-black text-base text-luxury-dark">
+              <span>Total:</span>
+              <span className="text-luxury-accent">₹{order.finalAmount}</span>
+            </div>
+            <div className="flex justify-between text-[11px] text-gray-500 pt-1">
+              <span>Payment Method:</span>
+              <span className="font-bold text-gray-700">{order.paymentMethod}</span>
             </div>
           </div>
         </div>
@@ -334,7 +438,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
             type="button"
             disabled={isReordering}
             onClick={handleReorder}
-            className="px-4 py-2 bg-luxury-warmWhite hover:bg-gray-100 text-luxury-dark border border-gray-300 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
+            className="px-4 py-2 bg-luxury-warmWhite hover:bg-gray-100 text-luxury-dark border border-gray-300 font-bold text-xs rounded-2xl flex items-center gap-1.5 transition-colors shadow-xs"
           >
             {isReordering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingBag className="w-3.5 h-3.5" />}
             <span>Buy Again</span>
@@ -345,7 +449,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
             <button
               type="button"
               onClick={() => setIsCancelling(true)}
-              className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl transition-colors"
+              className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-2xl transition-colors"
             >
               Cancel Order
             </button>
@@ -356,34 +460,37 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
             <button
               type="button"
               onClick={() => setIsReturning(true)}
-              className="px-4 py-2 bg-luxury-dark text-white hover:bg-luxury-accent hover:text-luxury-dark font-bold text-xs rounded-xl transition-colors flex items-center gap-1"
+              className="px-4 py-2 bg-luxury-dark text-white hover:bg-luxury-accent hover:text-luxury-dark font-bold text-xs rounded-2xl transition-colors flex items-center gap-1 shadow"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Request Return</span>
+              <span>7-Day Return</span>
             </button>
           )}
         </div>
 
-        {/* Cancellation Sub-form */}
+        {/* Cancellation Confirmation Box */}
         {isCancelling && (
-          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-3 animate-in fade-in">
-            <h5 className="font-bold text-xs text-rose-900">Are you sure you want to cancel?</h5>
+          <div className="p-4 sm:p-5 rounded-3xl bg-rose-50 border border-rose-200 space-y-3 animate-in fade-in">
+            <h5 className="font-bold text-xs text-rose-900 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
+              <span>Are you sure you want to cancel this order?</span>
+            </h5>
             <select
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs text-gray-800"
+              className="w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs text-gray-800 outline-none"
             >
               <option value="Changed my mind">Changed my mind</option>
               <option value="Ordered wrong size/color">Ordered wrong size/color</option>
               <option value="Found alternative footwear">Found alternative footwear</option>
               <option value="Delivery duration too long">Delivery duration too long</option>
-              <option value="Other">Other</option>
+              <option value="Other reason">Other reason</option>
             </select>
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-2 justify-end pt-1">
               <button
                 type="button"
                 onClick={() => setIsCancelling(false)}
-                className="px-3 py-1.5 bg-white text-gray-700 rounded-xl text-xs font-bold"
+                className="px-4 py-2 bg-white text-gray-700 rounded-xl text-xs font-bold border border-gray-200"
               >
                 Keep Order
               </button>
@@ -391,17 +498,17 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
                 type="button"
                 disabled={isSubmittingCancel}
                 onClick={handleCancelOrder}
-                className="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700"
+                className="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 shadow"
               >
-                {isSubmittingCancel ? 'Cancelling...' : 'Confirm Cancel'}
+                {isSubmittingCancel ? 'Cancelling...' : 'Confirm Cancellation'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Return Sub-form */}
+        {/* Return Request Box */}
         {isReturning && (
-          <div className="p-4 rounded-2xl bg-luxury-warmWhite border border-gray-200 space-y-3 animate-in fade-in">
+          <div className="p-4 sm:p-5 rounded-3xl bg-luxury-warmWhite border border-gray-200 space-y-3 animate-in fade-in">
             <h5 className="font-bold text-xs text-luxury-dark">7-Day Doorstep Return Request</h5>
             <select
               value={returnReason}
@@ -424,7 +531,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
               <button
                 type="button"
                 onClick={() => setIsReturning(false)}
-                className="px-3 py-1.5 bg-white text-gray-700 rounded-xl text-xs font-bold"
+                className="px-4 py-2 bg-white text-gray-700 rounded-xl text-xs font-bold border border-gray-200"
               >
                 Cancel
               </button>
@@ -432,7 +539,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
                 type="button"
                 disabled={isSubmittingReturn}
                 onClick={handleRequestReturn}
-                className="px-3 py-1.5 bg-luxury-dark text-white rounded-xl text-xs font-bold hover:bg-luxury-accent"
+                className="px-4 py-2 bg-luxury-dark text-white rounded-xl text-xs font-bold hover:bg-luxury-accent hover:text-luxury-dark transition-colors"
               >
                 {isSubmittingReturn ? 'Submitting...' : 'Submit Request'}
               </button>
@@ -441,7 +548,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onOrderUpdated }) => {
         )}
       </div>
 
-      {/* Write Review Modal for Delivered Items */}
+      {/* Rate & Review Modal strictly for Delivered Orders */}
       {reviewingProduct && (
         <WriteReviewModal
           isOpen={!!reviewingProduct}

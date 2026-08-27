@@ -40,8 +40,29 @@ export const adminService = {
     return await api.get('/admin/orders', { params });
   },
 
+  getOrderDetails: async (id) => {
+    return await api.get(`/admin/orders/${id}`);
+  },
+
+  approveOrder: async (id, data) => {
+    return await api.post(`/admin/orders/${id}/approve`, data);
+  },
+
   updateOrderStatus: async (id, data) => {
     return await api.patch(`/admin/orders/${id}/status`, data);
+  },
+
+  // Admin Notification Center
+  getAdminNotifications: async (params = {}) => {
+    return await api.get('/admin/notifications', { params });
+  },
+
+  markAdminNotificationRead: async (id) => {
+    return await api.patch(`/admin/notifications/${id}/read`);
+  },
+
+  markAllAdminNotificationsRead: async () => {
+    return await api.post('/admin/notifications/mark-all-read');
   },
 
   // Customers
@@ -49,16 +70,33 @@ export const adminService = {
     return await api.get('/admin/customers', { params });
   },
 
-  updateCustomerStatus: async (id, status) => {
-    return await api.patch(`/admin/customers/${id}/status`, { status });
+  getCustomerDetails: async (id) => {
+    return await api.get(`/admin/customers/${id}`);
   },
 
-  deleteCustomer: async (id) => {
-    return await api.delete(`/admin/customers/${id}`);
+  updateCustomerStatus: async (id, data) => {
+    const payload = typeof data === 'string' ? { status: data } : data;
+    return await api.patch(`/admin/customers/${id}/status`, payload);
+  },
+
+  updateCustomerAdminNotes: async (id, adminNotes) => {
+    return await api.patch(`/admin/customers/${id}/notes`, { adminNotes });
   },
 
   forceLogoutCustomer: async (id) => {
     return await api.post(`/admin/customers/${id}/force-logout`);
+  },
+
+  forcePasswordResetCustomer: async (id) => {
+    return await api.post(`/admin/customers/${id}/force-password-reset`);
+  },
+
+  deactivateCustomer: async (id) => {
+    return await api.post(`/admin/customers/${id}/deactivate`);
+  },
+
+  deleteCustomer: async (id) => {
+    return await api.delete(`/admin/customers/${id}`);
   },
 
   // Categories

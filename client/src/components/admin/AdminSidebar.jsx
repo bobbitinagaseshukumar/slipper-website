@@ -43,6 +43,7 @@ const AdminSidebar = ({
   onToggleCollapse,
   isMobileOpen = false,
   onCloseMobile,
+  unreadNewOrdersCount = 0,
 }) => {
   const { logout, user } = useAuth();
   const { settings } = useStoreSettings();
@@ -195,7 +196,12 @@ const AdminSidebar = ({
                       title={item.label}
                     >
                       <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-stone-950' : 'text-stone-400'}`} />
-                      {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      {!isCollapsed && <span className="truncate flex-1 text-left">{item.label}</span>}
+                      {!isCollapsed && item.id === 'orders' && unreadNewOrdersCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] animate-pulse">
+                          {unreadNewOrdersCount}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
