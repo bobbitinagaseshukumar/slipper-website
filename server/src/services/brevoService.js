@@ -60,13 +60,20 @@ const sendEmailViaBrevo = async ({
     ? to.map((item) => (typeof item === 'string' ? { email: item.trim() } : item))
     : [{ email: to.trim() }];
 
+  const validTags = Array.isArray(tags)
+    ? tags.filter((t) => typeof t === 'string' && t.trim().length > 0)
+    : [];
+
   const payload = {
     sender,
     to: recipientList,
     subject,
     htmlContent: html,
-    tags,
   };
+
+  if (validTags.length > 0) {
+    payload.tags = validTags;
+  }
 
   if (replyTo) {
     payload.replyTo = typeof replyTo === 'string' ? { email: replyTo } : replyTo;

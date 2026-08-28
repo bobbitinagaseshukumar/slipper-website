@@ -59,8 +59,8 @@ const sendRawEmail = async ({
         to: recipient,
         subject,
         html,
-        senderName: store.storeName || undefined,
-        senderEmail: store.supportEmail || undefined,
+        senderName: store.storeName || process.env.BREVO_SENDER_NAME || 'StyleVerse Footwear',
+        senderEmail: process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || store.supportEmail || undefined,
         tags: [emailType, category],
       });
       messageId = brevoRes.messageId;

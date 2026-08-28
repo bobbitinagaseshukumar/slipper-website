@@ -60,7 +60,7 @@ const AdminLogin = () => {
       } catch (otpErr) {
         // Fallback to direct admin login if OTP endpoint is unconfigured
         const res = await login(email, password);
-        const userRole = res?.data?.user?.role;
+        const userRole = res?.data?.user?.role || res?.user?.role || res?.role;
         if (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') {
           setSuccessMsg('Administrator authenticated successfully! Redirecting...');
           setTimeout(() => navigate('/admin', { replace: true }), 500);
