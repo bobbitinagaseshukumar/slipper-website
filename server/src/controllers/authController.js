@@ -210,12 +210,57 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+/**
+ * Firebase Sync Controller — Handles unified Google/Facebook login from Firebase client SDK
+ * Client sends: { firebaseUid, email, name, photoURL, loginProvider }
+ */
+const firebaseSync = async (req, res, next) => {
+  try {
+    const { firebaseUid, email, name, photoURL, loginProvider } = req.body;
+    if (!email) {
+      return errorResponse(res, 'Email is required for social login.', 400);
+    }
+
+    const userAgent = req.headers['user-agent'] || '';
+    const ipAddress = req.ip || req.connection?.remoteAddress || '';
+
+    const result = await authService.firebaseSync({
+      firebaseUid,
+      email,
+      name,
+      photoURL,
+      loginProvider,
+      userAgent,
+      ipAddress,
+    });
+
+    return successResponse(res, 'Authenticated successfully.', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Complete Onboarding Controller — Save additional profile data after social signup
+ */
+const completeOnboarding = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const result = await authService.completeOnboarding(userId, req.body);
+    return successResponse(res, 'Profile completed successfully.', result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAuthSettings,
   register,
   login,
   googleLogin,
   facebookLogin,
+  firebaseSync,
+  completeOnboarding,
   getMe,
   updateProfile,
   logout,

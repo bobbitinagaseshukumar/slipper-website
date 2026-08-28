@@ -22,16 +22,16 @@ const sanitizeUser = (user) => {
 /**
  * Helper to log auth audit events into AdminActivity
  */
-const logAuthActivity = async ({ action, description, performedBy = 'SYSTEM', targetId = null, targetType = 'USER', metadata = {} }) => {
+const logAuthActivity = async ({ action, description, performedBy = null, targetId = null, targetType = 'USER', metadata = {} }) => {
   try {
+    // Only log if we have a valid user ID to use as adminId
+    if (!performedBy || performedBy === 'SYSTEM') return;
     await prisma.adminActivity.create({
       data: {
+        adminId: performedBy,
         action,
-        description,
-        performedBy,
-        targetId,
-        targetType,
-        metadata: JSON.stringify(metadata),
+        details: description || `${action} | target: ${targetId || 'N/A'} | ${JSON.stringify(metadata)}`,
+        ipAddress: metadata?.ipAddress || null,
       },
     });
   } catch (err) {
@@ -218,7 +218,7 @@ const register = async ({
   });
 
   // Send Welcome Email asynchronously
-  emailService.sendWelcomeEmail(newUser.id).catch((err) => console.error('Welcome email error:', err.message));
+  emailService.sendWelcomeEmail(newUser).catch((err) => console.error('Welcome email error:', err.message));
 
   // Create Session in Database
   const session = await sessionService.createSession({
@@ -378,7 +378,7 @@ const googleAuth = async ({ email, name, photoURL, googleId, userAgent = '', ipA
       return newUser;
     });
 
-    emailService.sendWelcomeEmail(user.id).catch((err) => console.error('Welcome email error:', err.message));
+    emailService.sendWelcomeEmail(user).catch((err) => console.error('Welcome email error:', err.message));
   }
 
   await logAuthActivity({
@@ -465,7 +465,7 @@ const facebookAuth = async ({ email, name, photoURL, facebookId, userAgent = '',
       return newUser;
     });
 
-    emailService.sendWelcomeEmail(user.id).catch((err) => console.error('Welcome email error:', err.message));
+    emailService.sendWelcomeEmail(user).catch((err) => console.error('Welcome email error:', err.message));
   }
 
   await logAuthActivity({
@@ -654,12 +654,149 @@ const updateProfile = async (userId, data) => {
   return sanitizeUser(updatedUser);
 };
 
+/**
+ * Firebase Sync — Unified Social Login Handler
+ * Called by client AuthContext after Firebase popup auth completes
+ * Accepts { firebaseUid, email, name, photoURL, loginProvider }
+ * Returns { user, token, isNewCustomer }
+ */
+const firebaseSync = async ({ firebaseUid, email, name, photoURL, loginProvider = 'GOOGLE', userAgent = '', ipAddress = '' }) => {
+  const settings = await storeSettingsService.getStoreSettings().catch(() => ({}));
+  const normalizedEmail = email.toLowerCase().trim();
+  let isNewCustomer = false;
+
+  // Check if social login is enabled
+  if (loginProvider === 'GOOGLE' && settings.googleLoginEnabled === false) {
+    const error = new Error('Google login is currently disabled by store administrator.');
+    error.statusCode = 403;
+    throw error;
+  }
+  if (loginProvider === 'FACEBOOK' && settings.facebookLoginEnabled === false) {
+    const error = new Error('Facebook login is currently disabled by store administrator.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  let user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  });
+
+  if (user) {
+    if (user.isBlocked || user.status === 'BLOCKED' || user.status === 'SUSPENDED') {
+      const error = new Error('Your account has been temporarily blocked. Please contact customer support.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        firebaseUid: user.firebaseUid || firebaseUid || null,
+        profileImage: user.profileImage || photoURL || null,
+        lastLoginAt: new Date(),
+        loginProvider: user.loginProvider || loginProvider,
+        emailVerified: true,
+      },
+    });
+  } else {
+    isNewCustomer = true;
+    user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: name ? name.trim() : 'Valued Footwear Enthusiast',
+          email: normalizedEmail,
+          firebaseUid: firebaseUid || null,
+          profileImage: photoURL || null,
+          loginProvider: loginProvider,
+          role: 'CUSTOMER',
+          status: 'ACTIVE',
+          isBlocked: false,
+          emailVerified: true,
+          lastLoginAt: new Date(),
+        },
+      });
+
+      await tx.cart.create({ data: { userId: newUser.id } });
+      await tx.wishlist.create({ data: { userId: newUser.id } });
+
+      return newUser;
+    });
+
+    emailService.sendWelcomeEmail(user).catch((err) => console.error('Welcome email error:', err.message));
+  }
+
+  await logAuthActivity({
+    action: `${loginProvider}_LOGIN`,
+    description: `User authenticated via ${loginProvider}: ${normalizedEmail}`,
+    performedBy: user.id,
+    targetId: user.id,
+    metadata: { ipAddress, userAgent },
+  });
+
+  const session = await sessionService.createSession({
+    userId: user.id,
+    userAgent,
+    ipAddress,
+  });
+
+  const token = generateToken(user.id, user.role, session.sessionToken, session.id);
+
+  return {
+    user: sanitizeUser(user),
+    token,
+    isNewCustomer,
+    session: {
+      id: session.id,
+      deviceType: session.deviceType,
+      deviceName: session.deviceName,
+      browser: session.browser,
+      os: session.os,
+    },
+  };
+};
+
+/**
+ * Complete Customer Onboarding — Save additional profile data after registration
+ */
+const completeOnboarding = async (userId, data) => {
+  const { phone, whatsappNumber, preferredSize, preferredCategory, customFields = {} } = data;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    const error = new Error('User not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const updateData = {
+    isProfileComplete: true,
+  };
+
+  if (phone) updateData.phone = phone.trim();
+  if (whatsappNumber) updateData.whatsappNumber = whatsappNumber.trim();
+  if (preferredSize) updateData.preferredSize = String(preferredSize);
+  if (preferredCategory) updateData.preferredCategory = preferredCategory;
+  if (Object.keys(customFields).length > 0) {
+    const existingCustomFields = typeof user.customFields === 'object' && user.customFields !== null ? user.customFields : {};
+    updateData.customFields = { ...existingCustomFields, ...customFields };
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: updateData,
+  });
+
+  return sanitizeUser(updatedUser);
+};
+
 module.exports = {
   getPublicAuthSettings,
   register,
   login,
   googleAuth,
   facebookAuth,
+  firebaseSync,
+  completeOnboarding,
   forgotPassword,
   resetPassword,
   updateProfile,

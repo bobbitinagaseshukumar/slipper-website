@@ -388,7 +388,7 @@ const deactivateAccount = async (req, res, next) => {
   try {
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { status: 'INACTIVE' },
+      data: { status: 'SUSPENDED' },
     });
 
     await sessionService.revokeAllUserSessions(req.user.id, 'ACCOUNT_DEACTIVATED');

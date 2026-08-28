@@ -60,8 +60,17 @@ const DEFAULT_SETTINGS = {
   loginShowPhone: true,
   loginShowWhatsApp: true,
   loginShowEmail: true,
-  loginGoogleEnabled: true,
-  loginFacebookEnabled: true,
+  googleLoginEnabled: true,
+  facebookLoginEnabled: true,
+  emailLoginEnabled: true,
+  phoneLoginEnabled: true,
+  otpLoginEnabled: true,
+  registrationEnabled: true,
+  forgotPasswordEnabled: true,
+  passwordMinLength: 6,
+  passwordRequireUppercase: false,
+  passwordRequireNumber: false,
+  passwordRequireSpecialChar: false,
 
   // Register Page Controls
   registerTitle: 'Create Your Account',
@@ -199,8 +208,8 @@ const getPublicSettings = async () => {
     loginShowPhone: full.loginShowPhone !== false,
     loginShowWhatsApp: full.loginShowWhatsApp !== false,
     loginShowEmail: full.loginShowEmail !== false,
-    loginGoogleEnabled: full.loginGoogleEnabled !== false,
-    loginFacebookEnabled: full.loginFacebookEnabled !== false,
+    loginGoogleEnabled: full.googleLoginEnabled !== false,
+    loginFacebookEnabled: full.facebookLoginEnabled !== false,
 
     // Register Page Controls
     registerTitle: full.registerTitle || DEFAULT_SETTINGS.registerTitle,

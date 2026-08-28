@@ -25,9 +25,11 @@ router.post('/register', authLimiter, authController.register);
 router.post('/login', authLimiter, authController.login);
 router.post('/google', authLimiter, authController.googleLogin);
 router.post('/facebook', authLimiter, authController.facebookLogin);
+router.post('/firebase-sync', authLimiter, authController.firebaseSync);
 router.post('/logout', authenticateUser, authController.logout);
 router.get('/me', authenticateUser, authController.getMe);
 router.put('/profile', authenticateUser, authController.updateProfile);
+router.post('/complete-onboarding', authenticateUser, authController.completeOnboarding);
 router.post('/forgot-password', authLimiter, authController.forgotPassword);
 router.post('/reset-password', authLimiter, authController.resetPassword);
 

@@ -2880,7 +2880,7 @@ module.exports = {
           take: limitNum,
           orderBy: { createdAt: 'desc' },
           include: {
-            user: { select: { id: true, name: true, email: true } },
+            admin: { select: { id: true, name: true, email: true } },
           },
         }),
       ]);

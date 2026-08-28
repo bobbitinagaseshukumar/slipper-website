@@ -4,9 +4,6 @@ const { authenticateUser, requireRole } = require('../middleware/authMiddleware'
 
 const router = express.Router();
 
-// 1. Public reviews on product
-router.get('/:productId', reviewController.getProductReviews);
-
 // 2. Customer Protected routes
 router.use(authenticateUser);
 
@@ -19,5 +16,8 @@ router.delete('/:id', reviewController.deleteUserReview);
 router.get('/admin/all', requireRole(['ADMIN', 'SUPER_ADMIN']), reviewController.getAllReviewsAdmin);
 router.patch('/admin/:id/status', requireRole(['ADMIN', 'SUPER_ADMIN']), reviewController.toggleReviewApprovalAdmin);
 router.delete('/admin/:id', requireRole(['ADMIN', 'SUPER_ADMIN']), reviewController.deleteReviewAdmin);
+
+// 1. Public reviews on product
+router.get('/:productId', reviewController.getProductReviews);
 
 module.exports = router;

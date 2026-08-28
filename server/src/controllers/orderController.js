@@ -581,7 +581,7 @@ const requestReturn = async (req, res, next) => {
     const updated = await prisma.order.update({
       where: { id: order.id },
       data: {
-        status: 'RETURN_REQUESTED',
+        status: 'CANCELLED',
         notes: order.notes ? `${order.notes} | Return Request: ${reason} - ${comments || ''}` : `Return Request: ${reason} - ${comments || ''}`,
       },
     });

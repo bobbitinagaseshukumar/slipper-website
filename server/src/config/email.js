@@ -11,9 +11,9 @@ const SMTP_HOST = process.env.SMTP_HOST || (BREVO_API_KEY ? 'smtp-relay.brevo.co
 const SMTP_PORT = parseInt(process.env.SMTP_PORT, 10) || 587;
 const SMTP_USER = process.env.SMTP_USER || (BREVO_API_KEY ? process.env.BREVO_SENDER_EMAIL : '');
 const SMTP_PASS = process.env.SMTP_PASS || BREVO_API_KEY || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || process.env.BREVO_SENDER_EMAIL 
-  ? `"${process.env.BREVO_SENDER_NAME || 'AuraSole Footwear'}" <${process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER}>`
-  : '"AuraSole Footwear" <support@aurasole.com>';
+const EMAIL_FROM = (process.env.EMAIL_FROM || process.env.BREVO_SENDER_EMAIL)
+  ? `"${process.env.BREVO_SENDER_NAME || 'AuraSole Footwear'}" <${process.env.EMAIL_FROM || process.env.BREVO_SENDER_EMAIL}>`
+  : '"AuraSole Footwear" <noreply@aurasole.com>';
 
 let transporter = null;
 

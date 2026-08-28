@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+let cookieParser;
+try { cookieParser = require('cookie-parser'); } catch (e) { cookieParser = null; }
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
@@ -30,6 +32,9 @@ const app = express();
 
 // Security HTTP Headers
 app.use(helmet());
+
+// Parse cookies (if cookie-parser is available)
+if (cookieParser) app.use(cookieParser());
 
 // CORS Configuration supporting Vercel production, preview subdomains, and local dev
 const configuredOrigins = (process.env.FRONTEND_URL || '')

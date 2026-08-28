@@ -8,20 +8,19 @@ async function main() {
 
   // 1. Create Default Users (Admin & Customer)
   const salt = await bcrypt.genSalt(10);
-  const newAdminPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD || 'ChangeMe!Str0ng@2026', salt);
-  const legacyAdminPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD || 'ChangeMe!Str0ng@2026', salt);
+  const newAdminPassword = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD || 'styleverse@2409', salt);
   const customerPassword = await bcrypt.hash(process.env.SEED_CUSTOMER_PASSWORD || 'Customer!Str0ng@2026', salt);
 
   const admin1 = await prisma.user.upsert({
-    where: { email: 'nagaseshukumarbobbiti@gmail.com' },
+    where: { email: 'styleverseshope@gmail.com' },
     update: {
       passwordHash: newAdminPassword,
       role: 'ADMIN',
       status: 'ACTIVE',
     },
     create: {
-      name: 'Seshu Kumar (Super Admin)',
-      email: 'nagaseshukumarbobbiti@gmail.com',
+      name: 'StyleVerse Admin (Super Admin)',
+      email: 'styleverseshope@gmail.com',
       phone: '+919999977777',
       passwordHash: newAdminPassword,
       role: 'ADMIN',
